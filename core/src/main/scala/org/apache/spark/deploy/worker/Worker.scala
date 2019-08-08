@@ -191,7 +191,7 @@ private[deploy] class Worker(
         System.exit(1)
     }
   }
-
+  // TODO tianyafu worker启动
   override def onStart() {
     assert(!registered)
     logInfo("Starting Spark worker %s:%d with %d cores, %s RAM".format(
@@ -204,6 +204,7 @@ private[deploy] class Worker(
     webUi.bind()
 
     workerWebUiUrl = s"http://$publicAddress:${webUi.boundPort}"
+    // TODO tianyafu worker启动的时候向master启动
     registerWithMaster()
 
     metricsSystem.registerSource(workerSource)
@@ -240,7 +241,9 @@ private[deploy] class Worker(
         override def run(): Unit = {
           try {
             logInfo("Connecting to master " + masterAddress + "...")
+            // TODO tianyafu 获取master端点对象
             val masterEndpoint = rpcEnv.setupEndpointRef(masterAddress, Master.ENDPOINT_NAME)
+            //TODO tianyafu 通过master端点对象向master进行注册,主要是向master提供ip port cores memory 及worker自己的引用和所拥有的master端点对象的通信信息
             sendRegisterMessageToMaster(masterEndpoint)
           } catch {
             case ie: InterruptedException => // Cancelled
@@ -343,14 +346,14 @@ private[deploy] class Worker(
     registrationRetryTimer.foreach(_.cancel(true))
     registrationRetryTimer = None
   }
-
+  //TODO tianyafu worker启动的时候向master启动
   private def registerWithMaster() {
     // onDisconnected may be triggered multiple times, so don't attempt registration
     // if there are outstanding registration attempts scheduled.
     registrationRetryTimer match {
       case None =>
         registered = false
-        registerMasterFutures = tryRegisterAllMasters()
+        registerMasterFutures = tryRegisterAllMasters()//向所有的master去注册
         connectionAttemptCount = 0
         registrationRetryTimer = Some(forwordMessageScheduler.scheduleAtFixedRate(
           new Runnable {

@@ -231,22 +231,22 @@ private[deploy] class Master(
     case RevokedLeadership =>
       logError("Leadership has been revoked -- master shutting down.")
       System.exit(0)
-
+    // TODO tianyafu master接收worker节点的注册
     case RegisterWorker(
       id, workerHost, workerPort, workerRef, cores, memory, workerWebUiUrl, masterAddress) =>
       logInfo("Registering worker %s:%d with %d cores, %s RAM".format(
         workerHost, workerPort, cores, Utils.megabytesToString(memory)))
-      if (state == RecoveryState.STANDBY) {
+      if (state == RecoveryState.STANDBY) {// master处于standby状态
         workerRef.send(MasterInStandby)
-      } else if (idToWorker.contains(id)) {
+      } else if (idToWorker.contains(id)) {//判断是否已经注册过了
         workerRef.send(RegisterWorkerFailed("Duplicate worker ID"))
-      } else {
+      } else { // master处于active状态且该worker没有注册过
         val worker = new WorkerInfo(id, workerHost, workerPort, cores, memory,
           workerRef, workerWebUiUrl)
-        if (registerWorker(worker)) {
-          persistenceEngine.addWorker(worker)
+        if (registerWorker(worker)) { // registerWorker(worker) 这一步中去注册worker，成功返回true
+          persistenceEngine.addWorker(worker)//将worker节点的信息持久化，比如可以持久化到zookeeper中
           workerRef.send(RegisteredWorker(self, masterWebUiUrl, masterAddress))
-          schedule()
+          schedule() //worker注册成功表示有新的可用资源，所以这里会进行调度
         } else {
           val workerAddress = worker.endpoint.address
           logWarning("Worker registration failed. Attempted to re-register worker at same " +
@@ -255,7 +255,7 @@ private[deploy] class Master(
             + workerAddress))
         }
       }
-
+     // TODO tianyafu master接收应用程序的注册
     case RegisterApplication(description, driver) =>
       // TODO Prevent repeated registrations from some driver
       if (state == RecoveryState.STANDBY) {
