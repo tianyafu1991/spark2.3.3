@@ -81,6 +81,7 @@ private[spark] class StandaloneAppClient(
     private val registrationRetryThread =
       ThreadUtils.newDaemonSingleThreadScheduledExecutor("appclient-registration-retry-thread")
 
+    // TODO tianyafu 启动的时候向master注册
     override def onStart(): Unit = {
       try {
         registerWithMaster(1)

@@ -565,6 +565,7 @@ private[deploy] class Worker(
         }
       }
 
+      // TODO tianyafu 在worker节点上启动driver
     case LaunchDriver(driverId, driverDesc) =>
       logInfo(s"Asked to launch driver $driverId")
       val driver = new DriverRunner(

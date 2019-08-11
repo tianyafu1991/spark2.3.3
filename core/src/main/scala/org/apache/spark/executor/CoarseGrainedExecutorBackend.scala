@@ -227,7 +227,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
 
       val env = SparkEnv.createExecutorEnv(
         driverConf, executorId, hostname, cores, cfg.ioEncryptionKey, isLocal = false)
-
+      // TODO tianyafu 实例化CoarseGrainedExecutorBackend对象
       env.rpcEnv.setupEndpoint("Executor", new CoarseGrainedExecutorBackend(
         env.rpcEnv, driverUrl, executorId, hostname, cores, userClassPath, env))
       workerUrl.foreach { url =>
