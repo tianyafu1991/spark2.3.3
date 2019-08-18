@@ -34,3 +34,5 @@ log-parent/
 /.idea/compiler.xml
 /.idea/misc.xml
 /.idea/workspace.xml
+/rebel-remote.xml
+/rebel.xml

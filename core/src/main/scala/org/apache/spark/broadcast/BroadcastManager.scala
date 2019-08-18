@@ -38,10 +38,12 @@ private[spark] class BroadcastManager(
   initialize()
 
   // Called by SparkContext or Executor before using Broadcast
+  // TODO tianyafu 实例化BroadcastFactory
   private def initialize() {
     synchronized {
       if (!initialized) {
         broadcastFactory = new TorrentBroadcastFactory
+        //工厂模式创建BroadcastManager
         broadcastFactory.initialize(isDriver, conf, securityManager)
         initialized = true
       }

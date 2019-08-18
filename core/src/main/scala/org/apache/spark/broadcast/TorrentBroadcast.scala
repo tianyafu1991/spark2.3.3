@@ -211,6 +211,7 @@ private[spark] class TorrentBroadcast[T: ClassTag](obj: T, id: Long)
       Option(broadcastCache.get(broadcastId)).map(_.asInstanceOf[T]).getOrElse {
         setConf(SparkEnv.get.conf)
         val blockManager = SparkEnv.get.blockManager
+        //TODO tianyafu 先通过BlockManager在本地找，找不到的话就到Driver或其他Executor中远程fetch
         blockManager.getLocalValues(broadcastId) match {
           case Some(blockResult) =>
             if (blockResult.data.hasNext) {
@@ -225,9 +226,11 @@ private[spark] class TorrentBroadcast[T: ClassTag](obj: T, id: Long)
             } else {
               throw new SparkException(s"Failed to get locally stored broadcast data: $broadcastId")
             }
+            // 本地没找到
           case None =>
             logInfo("Started reading broadcast variable " + id)
             val startTimeMs = System.currentTimeMillis()
+            //到Driver或其他Executor中远程fetch
             val blocks = readBlocks()
             logInfo("Reading broadcast variable " + id + " took" + Utils.getUsedTimeMs(startTimeMs))
 
@@ -237,6 +240,7 @@ private[spark] class TorrentBroadcast[T: ClassTag](obj: T, id: Long)
               // Store the merged copy in BlockManager so other tasks on this executor don't
               // need to re-fetch it.
               val storageLevel = StorageLevel.MEMORY_AND_DISK
+              //远程获取后把blocks存入本地
               if (!blockManager.putSingle(broadcastId, obj, storageLevel, tellMaster = false)) {
                 throw new SparkException(s"Failed to store $broadcastId in BlockManager")
               }
