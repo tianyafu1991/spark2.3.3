@@ -985,6 +985,7 @@ class DAGScheduler(
     logDebug("submitMissingTasks(" + stage + ")")
 
     // First figure out the indexes of partition ids to compute.
+    //TODO tianyafu 获取到要进行计算的partitions 的ids
     val partitionsToCompute: Seq[Int] = stage.findMissingPartitions()
 
     // Use the scheduling pool, job group, description, etc. from an ActiveJob associated
@@ -1007,7 +1008,7 @@ class DAGScheduler(
     val taskIdToLocations: Map[Int, Seq[TaskLocation]] = try {
       stage match {
         case s: ShuffleMapStage =>
-          // TODO  id是partition的id ,getPreferredLocs()方法中获取到该 partition 的数据本地化的一个list
+          // TODO  获取partition的数据本地化的list id是partition的id ,getPreferredLocs()方法中获取到该 partition 的数据本地化的一个list
           partitionsToCompute.map { id => (id, getPreferredLocs(stage.rdd, id))}.toMap
         case s: ResultStage =>
           partitionsToCompute.map { id =>
@@ -1789,16 +1790,18 @@ class DAGScheduler(
       visited: HashSet[(RDD[_], Int)]): Seq[TaskLocation] = {
     // If the partition has already been visited, no need to re-visit.
     // This avoids exponential path exploration.  SPARK-695
-    if (!visited.add((rdd, partition))) {
+    if (!visited.add((rdd, partition))) {//把rdd和partition加入到hashset中，如果不成功，说明已经获取过数据的位置信息了
       // Nil has already been returned for previously visited partitions.
       return Nil
     }
     // If the partition is cached, return the cache locations
+    //如果有缓存过的话，从缓存中获取并返回
     val cached = getCacheLocs(rdd)(partition)
     if (cached.nonEmpty) {
       return cached
     }
     // If the RDD has some placement preferences (as is the case for input RDDs), get those
+    //调用了rdd的getPreferredLocations方法获取数据本地化的位置信息
     val rddPrefs = rdd.preferredLocations(rdd.partitions(partition)).toList
     if (rddPrefs.nonEmpty) {
       return rddPrefs.map(TaskLocation(_))
@@ -1807,6 +1810,7 @@ class DAGScheduler(
     // If the RDD has narrow dependencies, pick the first partition of the first narrow dependency
     // that has any placement preferences. Ideally we would choose based on transfer sizes,
     // but this will do for now.
+    //如果rdd有窄依赖，就
     rdd.dependencies.foreach {
       case n: NarrowDependency[_] =>
         for (inPart <- n.getParents(partition)) {
