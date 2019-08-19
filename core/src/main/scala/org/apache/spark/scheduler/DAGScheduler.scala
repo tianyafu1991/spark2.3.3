@@ -316,15 +316,18 @@ class DAGScheduler(
    * shuffle map stage doesn't already exist, this method will create the shuffle map stage in
    * addition to any missing ancestor shuffle map stages.
    */
+  //TODO tianyafu 获取或者创建shuffleMapStage
   private def getOrCreateShuffleMapStage(
       shuffleDep: ShuffleDependency[_, _, _],
       firstJobId: Int): ShuffleMapStage = {
+    // 从hashmap中查找这个shuffleId是否存在
     shuffleIdToMapStage.get(shuffleDep.shuffleId) match {
       case Some(stage) =>
         stage
 
       case None =>
         // Create stages for all missing ancestor shuffle dependencies.
+        //获取到所有丢失的父shuffle依赖
         getMissingAncestorShuffleDependencies(shuffleDep.rdd).foreach { dep =>
           // Even though getMissingAncestorShuffleDependencies only returns shuffle dependencies
           // that were not already in shuffleIdToMapStage, it's possible that by the time we
@@ -346,8 +349,10 @@ class DAGScheduler(
    * locations that are still available from the previous shuffle to avoid unnecessarily
    * regenerating data.
    */
+  // TODO tianyafu 这个的mapOutputTracker暂时不知道是什么
   def createShuffleMapStage(shuffleDep: ShuffleDependency[_, _, _], jobId: Int): ShuffleMapStage = {
     val rdd = shuffleDep.rdd
+    //一个分区对应一个task
     val numTasks = rdd.partitions.length
     val parents = getOrCreateParentStages(rdd, jobId)
     val id = nextStageId.getAndIncrement()
@@ -389,13 +394,16 @@ class DAGScheduler(
    * Get or create the list of parent stages for a given RDD.  The new Stages will be created with
    * the provided firstJobId.
    */
+  //TODO tianyafu 根据传入的rdd获取或者创建所有的父Stage
   private def getOrCreateParentStages(rdd: RDD[_], firstJobId: Int): List[Stage] = {
+    //getShuffleDependencies方法获取到rdd的所有父shuffle依赖
     getShuffleDependencies(rdd).map { shuffleDep =>
       getOrCreateShuffleMapStage(shuffleDep, firstJobId)
     }.toList
   }
 
   /** Find ancestor shuffle dependencies that are not registered in shuffleToMapStage yet */
+  //TODO tianyafu 获取到丢失的父shuffle依赖
   private def getMissingAncestorShuffleDependencies(
       rdd: RDD[_]): ArrayStack[ShuffleDependency[_, _, _]] = {
     val ancestors = new ArrayStack[ShuffleDependency[_, _, _]]
@@ -408,6 +416,7 @@ class DAGScheduler(
       val toVisit = waitingForVisit.pop()
       if (!visited(toVisit)) {
         visited += toVisit
+        //找到该rdd的所有父shuffle依赖
         getShuffleDependencies(toVisit).foreach { shuffleDep =>
           if (!shuffleIdToMapStage.contains(shuffleDep.shuffleId)) {
             ancestors.push(shuffleDep)
@@ -433,14 +442,20 @@ class DAGScheduler(
    */
   private[scheduler] def getShuffleDependencies(
       rdd: RDD[_]): HashSet[ShuffleDependency[_, _, _]] = {
+    //存放rdd的父shuffle rdd
     val parents = new HashSet[ShuffleDependency[_, _, _]]
+    //存放已经访问过的窄依赖rdd
     val visited = new HashSet[RDD[_]]
+    //存放下一次循环需要访问的rdd
     val waitingForVisit = new ArrayStack[RDD[_]]
     waitingForVisit.push(rdd)
     while (waitingForVisit.nonEmpty) {
       val toVisit = waitingForVisit.pop()
       if (!visited(toVisit)) {
         visited += toVisit
+        //TODO tianyafu 这里foreach 会一直找，如果是产生shuffle的依赖，就放入parents这个HashSet中
+        // 如果不是shuffle的依赖 就放入到waitingForVisit这个ArrayStack中，ArrayStack是一个大小为1的数据结构
+        // 该方法意在寻找到父shuffle依赖，不关心窄依赖，所以用了ArrayStack来存放窄依赖
         toVisit.dependencies.foreach {
           case shuffleDep: ShuffleDependency[_, _, _] =>
             parents += shuffleDep
@@ -586,13 +601,14 @@ class DAGScheduler(
       resultHandler: (Int, U) => Unit,
       properties: Properties): JobWaiter[U] = {
     // Check to make sure we are not launching a task on a partition that does not exist.
+    //TODO tianyafu  校验partitions是否存在
     val maxPartitions = rdd.partitions.length
     partitions.find(p => p >= maxPartitions || p < 0).foreach { p =>
       throw new IllegalArgumentException(
         "Attempting to access a non-existent partition: " + p + ". " +
           "Total number of partitions: " + maxPartitions)
     }
-
+    // 获取jobId
     val jobId = nextJobId.getAndIncrement()
     if (partitions.size == 0) {
       // Return immediately if the job is running 0 tasks
@@ -602,7 +618,7 @@ class DAGScheduler(
     assert(partitions.size > 0)
     val func2 = func.asInstanceOf[(TaskContext, Iterator[_]) => _]
     val waiter = new JobWaiter(this, jobId, partitions.size, resultHandler)
-    // TODO tianyafu 这里提交job给消息循环器eventProcessLoop
+    // TODO tianyafu 这里提交job给消息循环器eventProcessLoop,其实质是将消息放入一个消息队列中，然后用一条线程 去处理
     eventProcessLoop.post(JobSubmitted(
       jobId, rdd, func2, partitions.toArray, callSite, waiter,
       SerializationUtils.clone(properties)))
@@ -634,6 +650,7 @@ class DAGScheduler(
     // TODO tianyafu 划分Stage
     val waiter = submitJob(rdd, func, partitions, callSite, resultHandler, properties)
     ThreadUtils.awaitReady(waiter.completionFuture, Duration.Inf)
+    //等待作业的结果是成功还是失败
     waiter.completionFuture.value.get match {
       case scala.util.Success(_) =>
         logInfo("Job %d finished: %s, took %f s".format
@@ -868,6 +885,7 @@ class DAGScheduler(
     try {
       // New stage creation may throw an exception if, for example, jobs are run on a
       // HadoopRDD whose underlying HDFS files have been deleted.
+      // TODO tianyafu 创建resultStage
       finalStage = createResultStage(finalRDD, func, partitions, jobId, callSite)
     } catch {
       case e: Exception =>
@@ -951,6 +969,7 @@ class DAGScheduler(
           submitMissingTasks(stage, jobId.get)
         } else {
           for (parent <- missing) {
+            //递归调用
             submitStage(parent)
           }
           waitingStages += stage
@@ -1831,6 +1850,7 @@ private[scheduler] class DAGSchedulerEventProcessLoop(dagScheduler: DAGScheduler
   /**
    * The main event loop of the DAG scheduler.
    */
+  // TODO tianyafu 开一条后台守护线程，从消息队列中获取一个消息（请求）,然后接受请求
   override def onReceive(event: DAGSchedulerEvent): Unit = {
     val timerContext = timer.time()
     try {
@@ -1841,6 +1861,7 @@ private[scheduler] class DAGSchedulerEventProcessLoop(dagScheduler: DAGScheduler
   }
 
   private def doOnReceive(event: DAGSchedulerEvent): Unit = event match {
+      // TODO tianyafu 作业提交
     case JobSubmitted(jobId, rdd, func, partitions, callSite, listener, properties) =>
       dagScheduler.handleJobSubmitted(jobId, rdd, func, partitions, callSite, listener, properties)
 
