@@ -273,6 +273,7 @@ public class TaskMemoryManager {
    *
    * @throws TooLargePageException
    */
+  // TODO tianyafu 分配一个内存页，把他添加到Page Table中来使用
   public MemoryBlock allocatePage(long size, MemoryConsumer consumer) {
     assert(consumer != null);
     assert(consumer.getMode() == tungstenMemoryMode);
