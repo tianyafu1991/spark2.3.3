@@ -420,6 +420,7 @@ class SparkContext(config: SparkConf) extends Logging {
     listenerBus.addToStatusQueue(_statusStore.listener.get)
 
     // Create the Spark execution environment (cache, map output tracker, etc)
+    //TODO tianyafu 创建sparkEnv
     _env = createSparkEnv(_conf, isLocal, listenerBus)
     SparkEnv.set(_env)
 
@@ -493,12 +494,13 @@ class SparkContext(config: SparkConf) extends Logging {
     val (sched, ts) = SparkContext.createTaskScheduler(this, master, deployMode)
     _schedulerBackend = sched
     _taskScheduler = ts
-    // 创建DAGScheduler
+    //TODO tianyafu 创建DAGScheduler
     _dagScheduler = new DAGScheduler(this)
     _heartbeatReceiver.ask[Boolean](TaskSchedulerIsSet)
 
     // start TaskScheduler after taskScheduler sets DAGScheduler reference in DAGScheduler's
     // constructor
+    //TODO tianyafu 启动调度
     _taskScheduler.start()
 
     _applicationId = _taskScheduler.applicationId()
@@ -2719,6 +2721,7 @@ object SparkContext extends Logging {
         val scheduler = new TaskSchedulerImpl(sc)
         val masterUrls = sparkUrl.split(",").map("spark://" + _)
         val backend = new StandaloneSchedulerBackend(scheduler, sc, masterUrls)
+        //根据调度策略创建调度池
         scheduler.initialize(backend)
         (backend, scheduler)
 

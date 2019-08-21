@@ -142,6 +142,7 @@ private[spark] class TaskSchedulerImpl(
     this.dagScheduler = dagScheduler
   }
 
+  //TODO tianyafu 根据调度策略创建调度池
   def initialize(backend: SchedulerBackend) {
     this.backend = backend
     schedulableBuilder = {
