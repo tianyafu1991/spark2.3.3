@@ -171,9 +171,13 @@ private[spark] class Executor(
 
   private[executor] def numRunningTasks: Int = runningTasks.size()
 
+  // TODO tianyafu 执行task
   def launchTask(context: ExecutorBackend, taskDescription: TaskDescription): Unit = {
+    //构建TaskRunner
     val tr = new TaskRunner(context, taskDescription)
+    //taskRunner放进map中
     runningTasks.put(taskDescription.taskId, tr)
+    //用线程池中的线程执行任务
     threadPool.execute(tr)
   }
 
@@ -287,10 +291,12 @@ private[spark] class Executor(
       notifyAll()
     }
 
+    // TODO tianyafu
     override def run(): Unit = {
       threadId = Thread.currentThread.getId
       Thread.currentThread.setName(threadName)
       val threadMXBean = ManagementFactory.getThreadMXBean
+      // 内存管理
       val taskMemoryManager = new TaskMemoryManager(env.memoryManager, taskId)
       val deserializeStartTime = System.currentTimeMillis()
       val deserializeStartCpuTime = if (threadMXBean.isCurrentThreadCpuTimeSupported) {
@@ -299,6 +305,7 @@ private[spark] class Executor(
       Thread.currentThread.setContextClassLoader(replClassLoader)
       val ser = env.closureSerializer.newInstance()
       logInfo(s"Running $taskName (TID $taskId)")
+      //给driver发信息改变任务的状态
       execBackend.statusUpdate(taskId, TaskState.RUNNING, EMPTY_BYTE_BUFFER)
       var taskStart: Long = 0
       var taskStartCpu: Long = 0

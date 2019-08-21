@@ -89,12 +89,15 @@ private[spark] class CoarseGrainedExecutorBackend(
     case RegisterExecutorFailed(message) =>
       exitExecutor(1, "Slave registration failed: " + message)
 
+      //TODO tianyafu 接收到来自CoarseGrainedSchedulerBackEnd调用的launchTask
     case LaunchTask(data) =>
       if (executor == null) {
         exitExecutor(1, "Received LaunchTask command but executor was null")
       } else {
+        //反序列化
         val taskDesc = TaskDescription.decode(data.value)
         logInfo("Got assigned task " + taskDesc.taskId)
+        // 交给executer去执行
         executor.launchTask(this, taskDesc)
       }
 
