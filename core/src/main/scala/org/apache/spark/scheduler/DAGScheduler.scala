@@ -394,9 +394,9 @@ class DAGScheduler(
    * Get or create the list of parent stages for a given RDD.  The new Stages will be created with
    * the provided firstJobId.
    */
-  //TODO tianyafu 根据传入的rdd获取或者创建所有的父Stage
+  //TODO tianyafu 根据传入的rdd获取或者创建所有的直接父Stage
   private def getOrCreateParentStages(rdd: RDD[_], firstJobId: Int): List[Stage] = {
-    //getShuffleDependencies方法获取到rdd的所有父shuffle依赖
+    //getShuffleDependencies方法获取到rdd的直接父shuffle依赖
     getShuffleDependencies(rdd).map { shuffleDep =>
       getOrCreateShuffleMapStage(shuffleDep, firstJobId)
     }.toList
@@ -440,6 +440,7 @@ class DAGScheduler(
    *
    * This function is scheduler-visible for the purpose of unit testing.
    */
+  //TODO tianyafu 返回传入的rdd的所有直接父shuffle rdd
   private[scheduler] def getShuffleDependencies(
       rdd: RDD[_]): HashSet[ShuffleDependency[_, _, _]] = {
     //存放rdd的父shuffle rdd
@@ -453,7 +454,7 @@ class DAGScheduler(
       val toVisit = waitingForVisit.pop()
       if (!visited(toVisit)) {
         visited += toVisit
-        //TODO tianyafu 这里foreach 会一直找，如果是产生shuffle的依赖，就放入parents这个HashSet中
+        //TODO tianyafu 广度优先算法 这里foreach 会一直找，如果是产生shuffle的依赖，就放入parents这个HashSet中
         // 如果不是shuffle的依赖 就放入到waitingForVisit这个ArrayStack中，ArrayStack是一个大小为1的数据结构
         // 该方法意在寻找到父shuffle依赖，不关心窄依赖，所以用了ArrayStack来存放窄依赖
         toVisit.dependencies.foreach {
@@ -593,6 +594,7 @@ class DAGScheduler(
    *
    * @throws IllegalArgumentException when partitions ids are illegal
    */
+  //TODO tianyafu 作业的提交
   def submitJob[T, U](
       rdd: RDD[T],
       func: (TaskContext, Iterator[T]) => U,
@@ -601,7 +603,7 @@ class DAGScheduler(
       resultHandler: (Int, U) => Unit,
       properties: Properties): JobWaiter[U] = {
     // Check to make sure we are not launching a task on a partition that does not exist.
-    //TODO tianyafu  校验partitions是否存在
+    //TODO tianyafu  校验partitions长度是否有错误 这里的rdd是finalRDD
     val maxPartitions = rdd.partitions.length
     partitions.find(p => p >= maxPartitions || p < 0).foreach { p =>
       throw new IllegalArgumentException(
@@ -639,6 +641,7 @@ class DAGScheduler(
    *
    * @note Throws `Exception` when the job fails
    */
+  //TODO tianyafu 执行job
   def runJob[T, U](
       rdd: RDD[T],
       func: (TaskContext, Iterator[T]) => U,
@@ -910,6 +913,7 @@ class DAGScheduler(
     val stageInfos = stageIds.flatMap(id => stageIdToStage.get(id).map(_.latestInfo))
     listenerBus.post(
       SparkListenerJobStart(job.jobId, jobSubmissionTime, stageInfos, properties))
+    //提交finalStage
     submitStage(finalStage)
   }
 

@@ -389,6 +389,7 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
     }
 
     // TODO (prashant) send conf instead of properties
+    //创建driverEndpoint
     driverEndpoint = createDriverEndpointRef(properties)
   }
 
