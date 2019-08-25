@@ -241,6 +241,7 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
       val taskDescs = CoarseGrainedSchedulerBackend.this.synchronized {
         // Filter out executors under killing
         val activeExecutors = executorDataMap.filterKeys(executorIsAlive)
+        //获取到各个Executor可以使用的资源（也就是CPU核数）
         val workOffers = activeExecutors.map {
           case (id, executorData) =>
             new WorkerOffer(id, executorData.executorHost, executorData.freeCores)

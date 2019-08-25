@@ -244,7 +244,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
       }
     }
   }
-
+  //TODO tianyafu 主要入口类
   def main(args: Array[String]) {
     var driverUrl: String = null
     var executorId: String = null
@@ -292,7 +292,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
       appId == null) {
       printUsageAndExit()
     }
-
+    //TODO tianyafu 最主要的代码
     run(driverUrl, executorId, hostname, cores, appId, workerUrl, userClassPath)
     System.exit(0)
   }

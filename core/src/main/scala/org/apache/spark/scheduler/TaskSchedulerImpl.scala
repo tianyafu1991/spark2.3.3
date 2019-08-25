@@ -177,11 +177,12 @@ private[spark] class TaskSchedulerImpl(
   override def postStartHook() {
     waitBackendReady()
   }
-
+  //TODO tianyafu 提交作业
   override def submitTasks(taskSet: TaskSet) {
     val tasks = taskSet.tasks
     logInfo("Adding task set " + taskSet.id + " with " + tasks.length + " tasks")
     this.synchronized {
+      //TODO tianyafu 创建一个TaskSetManager
       val manager = createTaskSetManager(taskSet, maxTaskFailures)
       val stage = taskSet.stageId
       val stageTaskSets =
@@ -194,6 +195,7 @@ private[spark] class TaskSchedulerImpl(
         throw new IllegalStateException(s"more than one active taskSet for stage $stage:" +
           s" ${stageTaskSets.toSeq.map{_._2.taskSet.id}.mkString(",")}")
       }
+      //TODO tianyafu 将TaskSetManager加入到调度池中
       schedulableBuilder.addTaskSetManager(manager, manager.taskSet.properties)
 
       if (!isLocal && !hasReceivedTask) {
@@ -342,16 +344,17 @@ private[spark] class TaskSchedulerImpl(
           !blacklistTracker.isExecutorBlacklisted(offer.executorId)
       }
     }.getOrElse(offers)
-
+    //TODO tianyafu 把executor打散，主要是为了计算资源的分配负载均衡
     val shuffledOffers = shuffleOffers(filteredOffers)
     // Build a list of tasks to assign to each worker.
+    //每个workOffer生成一个ArrayBuffer对象，大小为o.cores / CPUS_PER_TASK
     val tasks = shuffledOffers.map(o => new ArrayBuffer[TaskDescription](o.cores / CPUS_PER_TASK))
     val availableCpus = shuffledOffers.map(o => o.cores).toArray
     val sortedTaskSets = rootPool.getSortedTaskSetQueue
     for (taskSet <- sortedTaskSets) {
       logDebug("parentName: %s, name: %s, runningTasks: %s".format(
         taskSet.parent.name, taskSet.name, taskSet.runningTasks))
-      if (newExecAvail) {
+      if (newExecAvail) {//如果有新的可用的Executor，就要进行数据本地化的重新计算
         taskSet.executorAdded()
       }
     }
