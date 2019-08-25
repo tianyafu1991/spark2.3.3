@@ -913,7 +913,7 @@ class DAGScheduler(
     val stageInfos = stageIds.flatMap(id => stageIdToStage.get(id).map(_.latestInfo))
     listenerBus.post(
       SparkListenerJobStart(job.jobId, jobSubmissionTime, stageInfos, properties))
-    //提交finalStage
+    //TODO tianyafu 提交finalStage,先会递归提交所有的父Stage
     submitStage(finalStage)
   }
 
@@ -985,6 +985,7 @@ class DAGScheduler(
   }
 
   /** Called when stage's parents are available and we can now do its task. */
+  //TODO tianyafu 提交Tasks 所谓的MissingTasks就是没有前置Task的，即依赖链最左侧的Stage中的Tasks
   private def submitMissingTasks(stage: Stage, jobId: Int) {
     logDebug("submitMissingTasks(" + stage + ")")
 
@@ -1008,7 +1009,7 @@ class DAGScheduler(
         outputCommitCoordinator.stageStart(
           stage = s.id, maxPartitionId = s.rdd.partitions.length - 1)
     }
-    // TODO tianyafu
+    // TODO tianyafu 获取每个task的数据所在的位置 例如一个partition在hdfs上默认是3副本，那么这里就能获取到partition id及 3个副本的位置信息
     val taskIdToLocations: Map[Int, Seq[TaskLocation]] = try {
       stage match {
         case s: ShuffleMapStage =>
