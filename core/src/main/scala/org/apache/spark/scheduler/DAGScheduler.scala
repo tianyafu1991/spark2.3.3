@@ -1083,7 +1083,7 @@ class DAGScheduler(
         // Abort execution
         return
     }
-
+    //TODO tianyafu 根据stage生成相应的task的序列
     val tasks: Seq[Task[_]] = try {
       val serializedTaskMetrics = closureSerializer.serialize(stage.latestInfo.taskMetrics).array()
       stage match {
@@ -1118,6 +1118,7 @@ class DAGScheduler(
     if (tasks.size > 0) {
       logInfo(s"Submitting ${tasks.size} missing tasks from $stage (${stage.rdd}) (first 15 " +
         s"tasks are for partitions ${tasks.take(15).map(_.partitionId)})")
+      //TODO tianyafu taskScheduler提交taskSet
       taskScheduler.submitTasks(new TaskSet(
         tasks.toArray, stage.id, stage.latestInfo.attemptNumber, jobId, properties))
     } else {
@@ -1789,6 +1790,7 @@ class DAGScheduler(
    * methods (getCacheLocs()); please be careful when modifying this method, because any new
    * DAGScheduler state accessed by it may require additional synchronization.
    */
+  //TODO tianyafu 获取rdd的的每一个partition的位置信息
   private def getPreferredLocsInternal(
       rdd: RDD[_],
       partition: Int,
@@ -1815,7 +1817,7 @@ class DAGScheduler(
     // If the RDD has narrow dependencies, pick the first partition of the first narrow dependency
     // that has any placement preferences. Ideally we would choose based on transfer sizes,
     // but this will do for now.
-    //如果rdd有窄依赖，就
+    //如果rdd有窄依赖，就获取到窄依赖的数据位置信息
     rdd.dependencies.foreach {
       case n: NarrowDependency[_] =>
         for (inPart <- n.getParents(partition)) {
