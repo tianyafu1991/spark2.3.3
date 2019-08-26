@@ -236,6 +236,8 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
     }
 
     // Make fake resource offers on all executors
+    //TODO tianyafu 获取到Worker的可用计算资源 调用TaskScheduler的resourceOffers方法计算Task分配到哪个executor上执行（遵循最大化数据本地性）
+    // 并执行Tasks
     private def makeOffers() {
       // Make sure no executor is killed while some task is launching on it
       val taskDescs = CoarseGrainedSchedulerBackend.this.synchronized {
@@ -246,9 +248,11 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
           case (id, executorData) =>
             new WorkerOffer(id, executorData.executorHost, executorData.freeCores)
         }.toIndexedSeq
+        //TODO tianyafu 按照最大化数据本地性的原则，计算Task要分配到哪个Executor
         scheduler.resourceOffers(workOffers)
       }
       if (!taskDescs.isEmpty) {
+        // 执行Tasks
         launchTasks(taskDescs)
       }
     }
@@ -286,10 +290,11 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
     }
 
     // Launch tasks returned by a set of resource offers
+    //TODO tianyafu 给CoarseGrainedExecutorBackend发送LaunchTask的消息 去执行Task
     private def launchTasks(tasks: Seq[Seq[TaskDescription]]) {
       for (task <- tasks.flatten) {
         val serializedTask = TaskDescription.encode(task)
-        if (serializedTask.limit() >= maxRpcMessageSize) {
+        if (serializedTask.limit() >= maxRpcMessageSize) { // 序列化后的Task的大小超出了RPC通信的最大大小，就终止任务
           Option(scheduler.taskIdToTaskSetManager.get(task.taskId)).foreach { taskSetMgr =>
             try {
               var msg = "Serialized task %s:%d was %d bytes, which exceeds max allowed: " +
@@ -304,11 +309,11 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
         }
         else {
           val executorData = executorDataMap(task.executorId)
-          executorData.freeCores -= scheduler.CPUS_PER_TASK
+          executorData.freeCores -= scheduler.CPUS_PER_TASK //Executor的可用的CPU要减去Task所消耗的CPU数
 
           logDebug(s"Launching task ${task.taskId} on executor id: ${task.executorId} hostname: " +
             s"${executorData.executorHost}.")
-
+          //通过executorEndpoint给CoarseGrainedExecutorBackend发送LaunchTask的命令，CoarseGrainedExecutorBackend通过receive方法接收到消息
           executorData.executorEndpoint.send(LaunchTask(new SerializableBuffer(serializedTask)))
         }
       }
