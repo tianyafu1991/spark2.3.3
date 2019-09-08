@@ -210,6 +210,7 @@ private[deploy] class Master(
   }
 
   override def receive: PartialFunction[Any, Unit] = {
+    //TODO tianyafu 选举出了新的leader
     case ElectedLeader =>
       val (storedApps, storedDrivers, storedWorkers) = persistenceEngine.readPersistedData(rpcEnv)
       state = if (storedApps.isEmpty && storedDrivers.isEmpty && storedWorkers.isEmpty) {
@@ -226,7 +227,7 @@ private[deploy] class Master(
           }
         }, WORKER_TIMEOUT_MS, TimeUnit.MILLISECONDS)
       }
-
+//TODO tianyafu Master HA 高可用恢复 完成恢复
     case CompleteRecovery => completeRecovery()
 
     case RevokedLeadership =>
@@ -316,7 +317,7 @@ private[deploy] class Master(
         case None =>
           logWarning(s"Got status update for unknown executor $appId/$execId")
       }
-
+//TODO tianyafu Driver状态发生改变
     case DriverStateChanged(driverId, state, exception) =>
       state match {
         case DriverState.ERROR | DriverState.FINISHED | DriverState.KILLED | DriverState.FAILED =>
@@ -753,6 +754,7 @@ private[deploy] class Master(
       ExecutorAdded(exec.id, worker.id, worker.hostPort, exec.cores, exec.memory))
   }
 
+  //TODO tianyafu 注册worker
   private def registerWorker(worker: WorkerInfo): Boolean = {
     // There may be one or more refs to dead workers on this same node (w/ different ID's),
     // remove them.
