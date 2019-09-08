@@ -124,7 +124,7 @@ private[deploy] class Master(
   private val restServerEnabled = conf.getBoolean("spark.master.rest.enabled", true)
   private var restServer: Option[StandaloneRestServer] = None
   private var restServerBoundPort: Option[Int] = None
-
+//TODO tianyafu master 启动
   override def onStart(): Unit = {
     logInfo("Starting Spark master at " + masterUrl)
     logInfo(s"Running Spark version ${org.apache.spark.SPARK_VERSION}")
@@ -158,6 +158,7 @@ private[deploy] class Master(
     applicationMetricsSystem.getServletHandlers.foreach(webUi.attachHandler)
 
     val serializer = new JavaSerializer(conf)
+    //TODO master HA 的四种方式
     val (persistenceEngine_, leaderElectionAgent_) = RECOVERY_MODE match {
       case "ZOOKEEPER" =>
         logInfo("Persisting recovery state to ZooKeeper")
@@ -539,6 +540,7 @@ private[deploy] class Master(
     }
   }
 
+  //TODO tianyafu master接收到来自workers和applications的请求后 会调用该方法 在其中会将没有响应的workers和applications给kill掉
   private def completeRecovery() {
     // Ensure "only-once" recovery semantics using a short synchronization period.
     if (state != RecoveryState.RECOVERING) { return }
