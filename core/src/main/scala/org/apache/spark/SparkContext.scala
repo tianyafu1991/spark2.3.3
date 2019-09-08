@@ -249,10 +249,12 @@ class SparkContext(config: SparkConf) extends Logging {
   private[spark] def listenerBus: LiveListenerBus = _listenerBus
 
   // This function allows components created by SparkEnv to be mocked in unit tests:
+  //TODO tianyafu sparkContext启动的时候创建SparkEnv
   private[spark] def createSparkEnv(
       conf: SparkConf,
       isLocal: Boolean,
       listenerBus: LiveListenerBus): SparkEnv = {
+    //创建DriverEnv
     SparkEnv.createDriverEnv(conf, isLocal, listenerBus, SparkContext.numDriverCores(master))
   }
 

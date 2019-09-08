@@ -155,6 +155,7 @@ object SparkEnv extends Logging {
   /**
    * Create a SparkEnv for the driver.
    */
+  //TODO tianyafu sparkContext启动的时候创建DriverEnv
   private[spark] def createDriverEnv(
       conf: SparkConf,
       isLocal: Boolean,
@@ -279,7 +280,7 @@ object SparkEnv extends Logging {
     def instantiateClassFromConf[T](propertyName: String, defaultClassName: String): T = {
       instantiateClass[T](conf.get(propertyName, defaultClassName))
     }
-
+    //TODO tianyafu 创建序列化器对象，默认是JavaSerializer
     val serializer = instantiateClassFromConf[Serializer](
       "spark.serializer", "org.apache.spark.serializer.JavaSerializer")
     logDebug(s"Using serializer: ${serializer.getClass}")
@@ -298,9 +299,9 @@ object SparkEnv extends Logging {
         RpcUtils.makeDriverRef(name, conf, rpcEnv)
       }
     }
-
+    //TODO 创建广播变量manager
     val broadcastManager = new BroadcastManager(isDriver, conf, securityManager)
-
+    //TODO 创建mapOutputTracker
     val mapOutputTracker = if (isDriver) {
       new MapOutputTrackerMaster(conf, broadcastManager, isLocal)
     } else {
@@ -314,6 +315,7 @@ object SparkEnv extends Logging {
         rpcEnv, mapOutputTracker.asInstanceOf[MapOutputTrackerMaster], conf))
 
     // Let the user specify short names for shuffle managers
+    //TODO tianyafu 创建shuffleManager
     val shortShuffleMgrNames = Map(
       "sort" -> classOf[org.apache.spark.shuffle.sort.SortShuffleManager].getName,
       "tungsten-sort" -> classOf[org.apache.spark.shuffle.sort.SortShuffleManager].getName)
