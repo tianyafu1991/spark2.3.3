@@ -181,6 +181,7 @@ private[spark] class TaskSetManager(
 
   // Add all our tasks to the pending lists. We do this in reverse order
   // of task index so that tasks with low indices get launched first.
+  //TODO tianyafu  根据task的数据所在的位置信息选择数据本地的级别
   for (i <- (0 until numTasks).reverse) {
     addPendingTask(i)
   }
@@ -209,11 +210,14 @@ private[spark] class TaskSetManager(
   private[scheduler] var emittedTaskSizeWarning = false
 
   /** Add a task to all the pending-task lists that it should be on. */
+  //TODO 根据task的数据所在的位置信息选择数据本地的级别
   private[spark] def addPendingTask(index: Int) {
     for (loc <- tasks(index).preferredLocations) {
       loc match {
+        //TODO tianyafu executor 中有缓存就将task放入 process_local的hashmap中
         case e: ExecutorCacheTaskLocation =>
           pendingTasksForExecutor.getOrElseUpdate(e.executorId, new ArrayBuffer) += index
+          // TODO tianyafu 在HDFS中缓存了就获取到缓存所在机器上的所有executor并将task放入 process_local的hashmap中
         case e: HDFSCacheTaskLocation =>
           val exe = sched.getExecutorsAliveOnHost(loc.host)
           exe match {
@@ -233,11 +237,9 @@ private[spark] class TaskSetManager(
         pendingTasksForRack.getOrElseUpdate(rack, new ArrayBuffer) += index
       }
     }
-
     if (tasks(index).preferredLocations == Nil) {
       pendingTasksWithNoPrefs += index
     }
-
     allPendingTasks += index  // No point scanning this whole list to find the old task there
   }
 
