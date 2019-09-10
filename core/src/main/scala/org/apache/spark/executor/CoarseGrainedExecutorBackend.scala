@@ -60,6 +60,7 @@ private[spark] class CoarseGrainedExecutorBackend(
     rpcEnv.asyncSetupEndpointRefByURI(driverUrl).flatMap { ref =>
       // This is a very fast action so we can use "ThreadUtils.sameThread"
       driver = Some(ref)
+      //TODO tianyafu CoarseGrainedExecutorBackend启动的时候向driver注册  实际是向CoarseGrainedSchedulerBackend中的内部类DriverEndpoint对象注册
       ref.ask[Boolean](RegisterExecutor(executorId, self, hostname, cores, extractLogUrls))
     }(ThreadUtils.sameThread).onComplete {
       // This is a very fast action so we can use "ThreadUtils.sameThread"
@@ -77,9 +78,11 @@ private[spark] class CoarseGrainedExecutorBackend(
   }
 
   override def receive: PartialFunction[Any, Unit] = {
+    //TODO tianyafu 当CoarseGrainedSchedulerBackend中的DriverEndpoint对象通过executorRef发送RegisteredExecutor消息后 这里就接收到了该消息
     case RegisteredExecutor =>
       logInfo("Successfully registered with driver")
       try {
+        //创建Executor对象
         executor = new Executor(executorId, hostname, env, userClassPath, isLocal = false)
       } catch {
         case NonFatal(e) =>

@@ -86,6 +86,7 @@ private[spark] class Executor(
   }
 
   // Start worker thread pool
+  //TODO tianyafu Executor中维护的线程池
   private val threadPool = {
     val threadFactory = new ThreadFactoryBuilder()
       .setDaemon(true)

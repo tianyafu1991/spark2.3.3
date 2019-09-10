@@ -165,13 +165,13 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
     }
 
     override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
-
+      //TODO tianyafu CoarseGrainedExecutorBackend启动的时候向driver注册
       case RegisterExecutor(executorId, executorRef, hostname, cores, logUrls) =>
-        if (executorDataMap.contains(executorId)) {
+        if (executorDataMap.contains(executorId)) {//TODO 重复注册
           executorRef.send(RegisterExecutorFailed("Duplicate executor ID: " + executorId))
           context.reply(true)
         } else if (scheduler.nodeBlacklist != null &&
-          scheduler.nodeBlacklist.contains(hostname)) {
+          scheduler.nodeBlacklist.contains(hostname)) {//TODO executor所在的node节点属于黑名单
           // If the cluster manager gives us an executor on a blacklisted node (because it
           // already started allocating those resources before we informed it of our blacklist,
           // or if it ignored our blacklist), then we reject that executor immediately.
@@ -190,6 +190,7 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
           addressToExecutorId(executorAddress) = executorId
           totalCoreCount.addAndGet(cores)
           totalRegisteredExecutors.addAndGet(1)
+          //TODO tianyafu 创建ExecutorData对象
           val data = new ExecutorData(executorRef, executorAddress, hostname,
             cores, cores, logUrls)
           // This must be synchronized because variables mutated
@@ -199,16 +200,18 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
             if (currentExecutorIdCounter < executorId.toInt) {
               currentExecutorIdCounter = executorId.toInt
             }
-            if (numPendingExecutors > 0) {
+            if (numPendingExecutors > 0) {//有executor注册过来 那么由master分配的executor但还没有来注册报到的数量就要减1
               numPendingExecutors -= 1
               logDebug(s"Decremented number of pending executors ($numPendingExecutors left)")
             }
           }
+          //TODO tianyafu 向CoarseGrainedExecutorBackend发送注册成功的消息 由CoarseGrainedExecutorBackend在receive方法中接收消息
           executorRef.send(RegisteredExecutor)
           // Note: some tests expect the reply to come after we put the executor in the map
           context.reply(true)
           listenerBus.post(
             SparkListenerExecutorAdded(System.currentTimeMillis(), executorId, data))
+          //TODO 有新的可用executor注册过来了 就可以为Task分配资源
           makeOffers()
         }
 
