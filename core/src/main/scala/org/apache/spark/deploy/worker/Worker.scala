@@ -234,14 +234,14 @@ private[deploy] class Worker(
     // Cancel any outstanding re-registration attempts because we found a new master
     cancelLastRegistrationRetry()
   }
-
+//TODO tianyafu 向所有的master去注册
   private def tryRegisterAllMasters(): Array[JFuture[_]] = {
     masterRpcAddresses.map { masterAddress =>
       registerMasterThreadPool.submit(new Runnable {
         override def run(): Unit = {
           try {
             logInfo("Connecting to master " + masterAddress + "...")
-            // TODO tianyafu 获取master端点对象
+            // TODO tianyafu 设置并获取master端点对象
             val masterEndpoint = rpcEnv.setupEndpointRef(masterAddress, Master.ENDPOINT_NAME)
             //TODO tianyafu 通过master端点对象向master进行注册,主要是向master提供ip port cores memory 及worker自己的引用和所拥有的master端点对象的通信信息
             sendRegisterMessageToMaster(masterEndpoint)
@@ -478,7 +478,7 @@ private[deploy] class Worker(
     case ReconnectWorker(masterUrl) =>
       logInfo(s"Master with url $masterUrl requested this worker to reconnect.")
       registerWithMaster()
-
+      // TODO tianyafu 在master调用allocateWorkerResourceToExecutors方法的时候 在launchExecutor方法中通过worker的endpoint对象发送launchExecutor消息
     case LaunchExecutor(masterUrl, appId, execId, appDesc, cores_, memory_) =>
       if (masterUrl != activeMasterUrl) {
         logWarning("Invalid Master (" + masterUrl + ") attempted to launch executor.")
@@ -515,6 +515,7 @@ private[deploy] class Worker(
             dirs
           })
           appDirectories(appId) = appLocalDirs
+          //TODO tianyafu 创建ExecutorRunner对象
           val manager = new ExecutorRunner(
             appId,
             execId,
@@ -532,6 +533,7 @@ private[deploy] class Worker(
             conf,
             appLocalDirs, ExecutorState.RUNNING)
           executors(appId + "/" + execId) = manager
+          //TODO 开始进行Executor的启动
           manager.start()
           coresUsed += cores_
           memoryUsed += memory_
@@ -547,7 +549,7 @@ private[deploy] class Worker(
               Some(e.toString), None))
         }
       }
-
+    //TODO 当executor的状态发生改变（正常或异常退出）时 会向worker报告
     case executorStateChanged @ ExecutorStateChanged(appId, execId, state, message, exitStatus) =>
       handleExecutorStateChanged(executorStateChanged)
 
@@ -565,9 +567,10 @@ private[deploy] class Worker(
         }
       }
 
-      // TODO tianyafu 在worker节点上启动driver
+      // TODO tianyafu 在worker节点上启动driver 由master 在调用schedule() 方法的时候通过worker的endpoint对象发送LaunchDriver()指令
     case LaunchDriver(driverId, driverDesc) =>
       logInfo(s"Asked to launch driver $driverId")
+      //TODO tianyafu 新建DriverRunner对象
       val driver = new DriverRunner(
         conf,
         driverId,
@@ -716,16 +719,19 @@ private[deploy] class Worker(
     memoryUsed -= driver.driverDesc.mem
     coresUsed -= driver.driverDesc.cores
   }
-
+  //TODO 处理executor的状态发生改变的事件 当executor的状态发生改变（正常或异常退出）时 会向worker报告
   private[worker] def handleExecutorStateChanged(executorStateChanged: ExecutorStateChanged):
     Unit = {
+    //TODO 向master发送executor状态发生改变的消息
     sendToMaster(executorStateChanged)
     val state = executorStateChanged.state
+    //TODO 这里 KILLED, FAILED, LOST, EXITED 都属于finished
     if (ExecutorState.isFinished(state)) {
       val appId = executorStateChanged.appId
       val fullId = appId + "/" + executorStateChanged.execId
       val message = executorStateChanged.message
       val exitStatus = executorStateChanged.exitStatus
+      //TODO tianyafu 有executor退出 则worker中维护的对应的数据结构、元数据信息都要做相应的改变
       executors.get(fullId) match {
         case Some(executor) =>
           logInfo("Executor " + fullId + " finished with state " + state +

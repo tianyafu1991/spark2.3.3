@@ -233,7 +233,7 @@ private[deploy] class Master(
     case RevokedLeadership =>
       logError("Leadership has been revoked -- master shutting down.")
       System.exit(0)
-    // TODO tianyafu master接收worker节点的注册
+    // TODO tianyafu master接收worker节点的注册 由worker在启动的时候调用sendRegisterMessageToMaster(masterEndpoint)发送RegisterWorker方法
     case RegisterWorker(
       id, workerHost, workerPort, workerRef, cores, memory, workerWebUiUrl, masterAddress) =>
       logInfo("Registering worker %s:%d with %d cores, %s RAM".format(
@@ -271,7 +271,7 @@ private[deploy] class Master(
         driver.send(RegisteredApplication(app.id, self))
         schedule()
       }
-
+    // TODO tianyafu 当executor的状态发生改变时 会发消息给worker worker在接收到消息之后 会将executor的状态发生改变的消息发送给master
     case ExecutorStateChanged(appId, execId, state, message, exitStatus) =>
       val execOption = idToApp.get(appId).flatMap(app => app.executors.get(execId))
       execOption match {
@@ -280,12 +280,12 @@ private[deploy] class Master(
           val oldState = exec.state
           exec.state = state
 
-          if (state == ExecutorState.RUNNING) {
+          if (state == ExecutorState.RUNNING) {//如果worker发过来的executor的状态为running 那么原先该executor的状态应该为launching
             assert(oldState == ExecutorState.LAUNCHING,
               s"executor $execId state transfer from $oldState to RUNNING is illegal")
             appInfo.resetRetryCount()
           }
-
+          //TODO tianyafu 发送Executor的状态发生变更的消息给Driver
           exec.application.driver.send(ExecutorUpdated(execId, state, message, exitStatus, false))
 
           if (ExecutorState.isFinished(state)) {
@@ -757,7 +757,7 @@ private[deploy] class Master(
         numWorkersVisited += 1
         //要worker的可用内存和CPU满足Driver的内存CPU要求之后才能launch driver
         if (worker.memoryFree >= driver.desc.mem && worker.coresFree >= driver.desc.cores) {
-          //启动driver
+          //TODO 启动driver
           launchDriver(worker, driver)
           waitingDrivers -= driver
           launched = true

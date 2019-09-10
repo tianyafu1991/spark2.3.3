@@ -38,6 +38,7 @@ import org.apache.spark.util.{Clock, ShutdownHookManager, SystemClock, Utils}
  * Manages the execution of one driver, including automatically restarting the driver on failure.
  * This is currently only used in standalone cluster deploy mode.
  */
+//TODO tianyafu 管理Driver的执行 包括driver的失败重试 这个只是在Standalone模式下使用
 private[deploy] class DriverRunner(
     conf: SparkConf,
     val driverId: String,
@@ -78,6 +79,7 @@ private[deploy] class DriverRunner(
   }
 
   /** Starts a thread to run and manage the driver. */
+  //TODO tianyafu 开辟一条线程执行driver的run方法
   private[worker] def start() = {
     new Thread("DriverRunner for " + driverId) {
       override def run() {
@@ -89,6 +91,7 @@ private[deploy] class DriverRunner(
           }
 
           // prepare driver jars and run driver
+          //TODO tianyafu 准备driver运行的环境并启动driver
           val exitCode = prepareAndRunDriver()
 
           // set final state depending on if forcibly killed and process exit code
@@ -135,6 +138,7 @@ private[deploy] class DriverRunner(
    * Creates the working directory for this driver.
    * Will throw an exception if there are errors preparing the directory.
    */
+  //TODO tianyafu 准备driver在本地文件系统中的工作目录
   private def createWorkingDirectory(): File = {
     val driverDir = new File(workDir, driverId)
     if (!driverDir.exists() && !driverDir.mkdirs()) {
@@ -147,6 +151,7 @@ private[deploy] class DriverRunner(
    * Download the user jar into the supplied directory and return its local path.
    * Will throw an exception if there are errors downloading the jar.
    */
+  //TODO tianyafu 下载我们自己写的jar包到driver的目录中
   private def downloadUserJar(driverDir: File): String = {
     val jarFileName = new URI(driverDesc.jarUrl).getPath.split("/").last
     val localJarFile = new File(driverDir, jarFileName)
@@ -167,10 +172,11 @@ private[deploy] class DriverRunner(
     }
     localJarFile.getAbsolutePath
   }
-
+  //TODO tianyafu 准备driver运行的环境并启动driver
   private[worker] def prepareAndRunDriver(): Int = {
+    //TODO tianyafu 准备driver在本地文件系统中的工作目录
     val driverDir = createWorkingDirectory()
-    val localJarFilename = downloadUserJar(driverDir)
+    val localJarFilename = downloadUserJar(driverDir)//下载我们自己写的jar包到driver的目录中
 
     def substituteVariables(argument: String): String = argument match {
       case "{{WORKER_URL}}" => workerUrl
@@ -179,9 +185,10 @@ private[deploy] class DriverRunner(
     }
 
     // TODO: If we add ability to submit multiple jars they should also be added here
+    //TODO tianyafu 创建processBuilder对象
     val builder = CommandUtils.buildProcessBuilder(driverDesc.command, securityManager,
       driverDesc.mem, sparkHome.getAbsolutePath, substituteVariables)
-
+    //TODO 启动Driver
     runDriver(builder, driverDir, driverDesc.supervise)
   }
 
@@ -189,6 +196,7 @@ private[deploy] class DriverRunner(
     builder.directory(baseDir)
     def initialize(process: Process): Unit = {
       // Redirect stdout and stderr to files
+      //TODO 将输出 重定向到baseDir下的stdout目录
       val stdout = new File(baseDir, "stdout")
       CommandUtils.redirectStream(process.getInputStream, stdout)
 
@@ -198,9 +206,10 @@ private[deploy] class DriverRunner(
       Files.append(header, stderr, StandardCharsets.UTF_8)
       CommandUtils.redirectStream(process.getErrorStream, stderr)
     }
+    //TODO tianyafu 这里才是真正的启动Driver
     runCommandWithRetry(ProcessBuilderLike(builder), initialize, supervise)
   }
-
+//TODO tianyafu 启动Driver进程
   private[worker] def runCommandWithRetry(
       command: ProcessBuilderLike, initialize: Process => Unit, supervise: Boolean): Int = {
     var exitCode = -1
@@ -209,20 +218,19 @@ private[deploy] class DriverRunner(
     // A run of this many seconds resets the exponential back-off.
     val successfulRunDuration = 5
     var keepTrying = !killed
-
     while (keepTrying) {
       logInfo("Launch Command: " + command.command.mkString("\"", "\" \"", "\""))
-
       synchronized {
         if (killed) { return exitCode }
+        //TODO tianyafu 启动一个新的进程
         process = Some(command.start())
-        initialize(process.get)
+        initialize(process.get)//将进程的输出重定向到具体的目录下
       }
-
       val processStart = clock.getTimeMillis()
+      //TODO 一直等待Driver进程知道退出并获取exitCode
       exitCode = process.get.waitFor()
-
       // check if attempting another run
+      //TODO tianyafu 如果是设置了supervise并且上面的driver是异常退出的并且不是被主动kill的 就会进入下一次循环，则又会启动一个driver 这就是所谓的cluster模式下的故障恢复
       keepTrying = supervise && exitCode != 0 && !killed
       if (keepTrying) {
         if (clock.getTimeMillis() - processStart > successfulRunDuration * 1000L) {
