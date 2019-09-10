@@ -36,9 +36,9 @@ private[spark] class ApplicationInfo(
   extends Serializable {
 
   @transient var state: ApplicationState.Value = _
-  @transient var executors: mutable.HashMap[Int, ExecutorDesc] = _
+  @transient var executors: mutable.HashMap[Int, ExecutorDesc] = _ //TODO 为该app分配的executor
   @transient var removedExecutors: ArrayBuffer[ExecutorDesc] = _
-  @transient var coresGranted: Int = _
+  @transient var coresGranted: Int = _  //TODO 为该app已经分配的cores数
   @transient var endTime: Long = _
   @transient var appSource: ApplicationSource = _
 
@@ -79,12 +79,14 @@ private[spark] class ApplicationInfo(
     }
   }
 
+  //TODO 为application分配executor
   private[master] def addExecutor(
       worker: WorkerInfo,
       cores: Int,
       useID: Option[Int] = None): ExecutorDesc = {
     val exec = new ExecutorDesc(newExecutorId(useID), this, worker, cores, desc.memoryPerExecutorMB)
     executors(exec.id) = exec
+    //分配后 该app维护的已经分配的cores数就需要加上本地分配的cores数
     coresGranted += cores
     exec
   }

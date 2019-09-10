@@ -602,23 +602,25 @@ private[deploy] class Master(
       app: ApplicationInfo,
       usableWorkers: Array[WorkerInfo],
       spreadOutApps: Boolean): Array[Int] = {
-    val coresPerExecutor = app.desc.coresPerExecutor
-    val minCoresPerExecutor = coresPerExecutor.getOrElse(1)
-    val oneExecutorPerWorker = coresPerExecutor.isEmpty
-    val memoryPerExecutor = app.desc.memoryPerExecutorMB
-    val numUsable = usableWorkers.length
-    val assignedCores = new Array[Int](numUsable) // Number of cores to give to each worker
-    val assignedExecutors = new Array[Int](numUsable) // Number of new executors on each worker
+    val coresPerExecutor = app.desc.coresPerExecutor //TODO 我们配置的单个executor需要分配的cores数
+    val minCoresPerExecutor = coresPerExecutor.getOrElse(1) //TODO 如果没有指定单个executor需要分配的cores数 那么默认一个executor一个CPU核
+    val oneExecutorPerWorker = coresPerExecutor.isEmpty //TODO 没有指定的话就是一个worker上分配一个executor   这个是为什么？？？
+    val memoryPerExecutor = app.desc.memoryPerExecutorMB //单个executor所需的内存
+    val numUsable = usableWorkers.length //可以使用的worker列表的长度
+    val assignedCores = new Array[Int](numUsable) // Number of cores to give to each worker 代表本次调度该worker上已经分配出去的cores数
+    val assignedExecutors = new Array[Int](numUsable) // Number of new executors on each worker 代表本次调度该worker已经分配的executor数
     //TODO tianyafu 实际分配的CPU 应用还需要的CPU与所有可用worker能提供的CPU之和 中取较小值 即尽可能的满足我们对于cores的要求
-    var coresToAssign = math.min(app.coresLeft, usableWorkers.map(_.coresFree).sum)
+    var coresToAssign = math.min(app.coresLeft, usableWorkers.map(_.coresFree).sum)//TODO tianyafu 此次调度需要分配的cores数
 
     /** Return whether the specified worker can launch an executor for this app. */
     def canLaunchExecutor(pos: Int): Boolean = {
-      val keepScheduling = coresToAssign >= minCoresPerExecutor
+      val keepScheduling = coresToAssign >= minCoresPerExecutor //TODO tianyafu  判断此次调度需要分配的cores数是否大于 该application设置的单个Executor要求达到的数量
+      //TODO tianyafu  判断当前worker中剩余可用的core数减去本次调度中已经分配的cores数（这里的已经分配是逻辑上的分配 实际分配动作并没有发生）之后是否还能够分配至少一个Executor
       val enoughCores = usableWorkers(pos).coresFree - assignedCores(pos) >= minCoresPerExecutor
 
       // If we allow multiple executors per worker, then we can always launch new executors.
       // Otherwise, if there is already an executor on this worker, just give it more cores.
+      //TODO tianyafu 如果我们配置了允许一台机器上起多个Executor 就可以在worker上继续新起Executor；如果不允许，那么就给该worker上已有的executor分配更多的CPU核数
       val launchingNewExecutor = !oneExecutorPerWorker || assignedExecutors(pos) == 0
       if (launchingNewExecutor) {
         val assignedMemory = assignedExecutors(pos) * memoryPerExecutor
@@ -628,22 +630,26 @@ private[deploy] class Master(
       } else {
         // We're adding cores to an existing executor, so no need
         // to check memory and executor limits
+        //TODO tianyafu 如果该worker的资源满足要求则该worker上可以继续分配Executor
         keepScheduling && enoughCores
       }
     }
 
     // Keep launching executors until no more workers can accommodate any
     // more executors, or if we have reached this application's limits
+    //TODO tianyafu 筛选出有资源可以使用的worker
     var freeWorkers = (0 until numUsable).filter(canLaunchExecutor)
-    while (freeWorkers.nonEmpty) {
+    while (freeWorkers.nonEmpty) {//TODO tianyafu 有可用的worker用来调度
       freeWorkers.foreach { pos =>
         var keepScheduling = true
         while (keepScheduling && canLaunchExecutor(pos)) {
-          coresToAssign -= minCoresPerExecutor
-          assignedCores(pos) += minCoresPerExecutor
+          coresToAssign -= minCoresPerExecutor//TODO 每调度一次就将该app还需要分配的cores数减掉单个Executor的cores数
+          assignedCores(pos) += minCoresPerExecutor //TODO 每调度一次就将该worker上已经分配的cores数加上单个Executor的cores数
 
           // If we are launching one executor per worker, then every iteration assigns 1 core
           // to the executor. Otherwise, every iteration assigns cores to a new executor.
+          //TODO tianyafu 如果我们配置的是一个worker上一个Executor，那么就将该worker上已经分配的executor数设置为1
+          //TODO 如果允许一个worker上起多个executor，就将该worker上已经分配的executor数加1
           if (oneExecutorPerWorker) {
             assignedExecutors(pos) = 1
           } else {
@@ -654,14 +660,16 @@ private[deploy] class Master(
           // many workers as possible. If we are not spreading out, then we should keep
           // scheduling executors on this worker until we use all of its resources.
           // Otherwise, just move on to the next worker.
+          //TODO tianyafu 如果我们的策略是尽可能的分散到所有的worker上的话 我们下一次调度就需要换一个worker了；如果是尽可能在少数几台worker上进行调度的话 就尽可能的利用worker的资源
           if (spreadOutApps) {
             keepScheduling = false
           }
         }
       }
+      //TODO tianyafu 每调度完一次之后 需要重新获取下一次调度还可以分配资源的worker
       freeWorkers = freeWorkers.filter(canLaunchExecutor)
     }
-    assignedCores
+    assignedCores //TODO 返回每个worker位置上需要分配的CPU数
   }
 
   /**
@@ -681,12 +689,12 @@ private[deploy] class Master(
           .filter(worker => worker.memoryFree >= app.desc.memoryPerExecutorMB &&
             worker.coresFree >= coresPerExecutor)
           .sortBy(_.coresFree).reverse
-        //TODO tianyafu 决定了在哪台机器上分配Executor 分配多少个CPU多少内存
+        //TODO tianyafu 决定了在哪台机器上分配多少个cores数
         val assignedCores = scheduleExecutorsOnWorkers(app, usableWorkers, spreadOutApps)
 
         // Now that we've decided how many cores to allocate on each worker, let's allocate them
         for (pos <- 0 until usableWorkers.length if assignedCores(pos) > 0) {
-          //TODO tianyafu 真正去分配Executor
+          //TODO tianyafu 真正去worker上分配cores数
           allocateWorkerResourceToExecutors(
             app, assignedCores(pos), app.desc.coresPerExecutor, usableWorkers(pos))
         }
@@ -710,10 +718,14 @@ private[deploy] class Master(
     // If the number of cores per executor is specified, we divide the cores assigned
     // to this worker evenly among the executors with no remainder.
     // Otherwise, we launch a single executor that grabs all the assignedCores on this worker.
+    //TODO tianyafu 本次调度为该应用分配的cores数除以单个executor需要的cores数就是要分配的executor的个数
     val numExecutors = coresPerExecutor.map { assignedCores / _ }.getOrElse(1)
+    //TODO 需要分配的cores数
     val coresToAssign = coresPerExecutor.getOrElse(assignedCores)
     for (i <- 1 to numExecutors) {
+      //TODO 为app分配executor
       val exec = app.addExecutor(worker, coresToAssign)
+      //TODO 向worker发送消息通知worker分配executor
       launchExecutor(worker, exec)
       app.state = ApplicationState.RUNNING
     }
@@ -756,6 +768,7 @@ private[deploy] class Master(
     startExecutorsOnWorkers()
   }
 
+  //TODO 向worker发送消息通知worker分配executor
   private def launchExecutor(worker: WorkerInfo, exec: ExecutorDesc): Unit = {
     logInfo("Launching executor " + exec.fullId + " on worker " + worker.id)
     worker.addExecutor(exec)
@@ -1021,11 +1034,12 @@ private[deploy] class Master(
     val date = new Date(now)
     new DriverInfo(now, newDriverId(date), desc, date)
   }
-//TODO tianyafu master发送指令远程让worker启动driver
+//TODO tianyafu master(实际是worker的消息通信对象)发送指令远程让worker启动driver
   private def launchDriver(worker: WorkerInfo, driver: DriverInfo) {
     logInfo("Launching driver " + driver.id + " on worker " + worker.id)
     worker.addDriver(driver)
     driver.worker = Some(worker)
+    //发送指令
     worker.endpoint.send(LaunchDriver(driver.id, driver.desc))
     driver.state = DriverState.RUNNING
   }
