@@ -609,6 +609,7 @@ private[deploy] class Master(
     val numUsable = usableWorkers.length
     val assignedCores = new Array[Int](numUsable) // Number of cores to give to each worker
     val assignedExecutors = new Array[Int](numUsable) // Number of new executors on each worker
+    //TODO tianyafu 实际分配的CPU 应用还需要的CPU与所有可用worker能提供的CPU之和 中取较小值 即尽可能的满足我们对于cores的要求
     var coresToAssign = math.min(app.coresLeft, usableWorkers.map(_.coresFree).sum)
 
     /** Return whether the specified worker can launch an executor for this app. */
@@ -672,16 +673,20 @@ private[deploy] class Master(
     for (app <- waitingApps) {
       val coresPerExecutor = app.desc.coresPerExecutor.getOrElse(1)
       // If the cores left is less than the coresPerExecutor,the cores left will not be allocated
+      //TODO tianyafu 如果剩余可用的core已经小于该应用单个Executor所需要的core的话 该application是无法调度的
       if (app.coresLeft >= coresPerExecutor) {
         // Filter out workers that don't have enough resources to launch an executor
+        //TODO tianyafu 对于资源没有达到app的所需时 过滤掉该worker
         val usableWorkers = workers.toArray.filter(_.state == WorkerState.ALIVE)
           .filter(worker => worker.memoryFree >= app.desc.memoryPerExecutorMB &&
             worker.coresFree >= coresPerExecutor)
           .sortBy(_.coresFree).reverse
+        //TODO tianyafu 决定了在哪台机器上分配Executor 分配多少个CPU多少内存
         val assignedCores = scheduleExecutorsOnWorkers(app, usableWorkers, spreadOutApps)
 
         // Now that we've decided how many cores to allocate on each worker, let's allocate them
         for (pos <- 0 until usableWorkers.length if assignedCores(pos) > 0) {
+          //TODO tianyafu 真正去分配Executor
           allocateWorkerResourceToExecutors(
             app, assignedCores(pos), app.desc.coresPerExecutor, usableWorkers(pos))
         }
@@ -696,6 +701,7 @@ private[deploy] class Master(
    * @param coresPerExecutor number of cores per executor
    * @param worker the worker info
    */
+  //TODO tianyafu 发指令让worker分配Executor所需的资源
   private def allocateWorkerResourceToExecutors(
       app: ApplicationInfo,
       assignedCores: Int,
@@ -717,11 +723,14 @@ private[deploy] class Master(
    * Schedule the currently available resources among waiting apps. This method will be called
    * every time a new app joins or resource availability changes.
    */
+  //TODO tianyafu 资源调度
   private def schedule(): Unit = {
+    //当前master必须是alive的方式才能进行资源调度
     if (state != RecoveryState.ALIVE) {
       return
     }
     // Drivers take strict precedence over executors
+    //打散活着的worker
     val shuffledAliveWorkers = Random.shuffle(workers.toSeq.filter(_.state == WorkerState.ALIVE))
     val numWorkersAlive = shuffledAliveWorkers.size
     var curPos = 0
@@ -734,7 +743,9 @@ private[deploy] class Master(
       while (numWorkersVisited < numWorkersAlive && !launched) {
         val worker = shuffledAliveWorkers(curPos)
         numWorkersVisited += 1
+        //要worker的可用内存和CPU满足Driver的内存CPU要求之后才能launch driver
         if (worker.memoryFree >= driver.desc.mem && worker.coresFree >= driver.desc.cores) {
+          //启动driver
           launchDriver(worker, driver)
           waitingDrivers -= driver
           launched = true
@@ -748,8 +759,10 @@ private[deploy] class Master(
   private def launchExecutor(worker: WorkerInfo, exec: ExecutorDesc): Unit = {
     logInfo("Launching executor " + exec.fullId + " on worker " + worker.id)
     worker.addExecutor(exec)
+    //TODO tianyafu 利用worker的消息通信对象发送launchExecutor的指令
     worker.endpoint.send(LaunchExecutor(masterUrl,
       exec.application.id, exec.id, exec.application.desc, exec.cores, exec.memory))
+    //TODO tianyafu 给driver发送 executor  加入的消息
     exec.application.driver.send(
       ExecutorAdded(exec.id, worker.id, worker.hostPort, exec.cores, exec.memory))
   }
@@ -1008,7 +1021,7 @@ private[deploy] class Master(
     val date = new Date(now)
     new DriverInfo(now, newDriverId(date), desc, date)
   }
-
+//TODO tianyafu master发送指令远程让worker启动driver
   private def launchDriver(worker: WorkerInfo, driver: DriverInfo) {
     logInfo("Launching driver " + driver.id + " on worker " + worker.id)
     worker.addDriver(driver)
