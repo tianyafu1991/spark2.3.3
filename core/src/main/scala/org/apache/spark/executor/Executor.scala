@@ -292,7 +292,7 @@ private[spark] class Executor(
       notifyAll()
     }
 
-    // TODO tianyafu
+    // TODO tianyafu Executor执行Task 调用run方法
     override def run(): Unit = {
       threadId = Thread.currentThread.getId
       Thread.currentThread.setName(threadName)
@@ -350,6 +350,7 @@ private[spark] class Executor(
         } else 0L
         var threwException = true
         val value = try {
+          //TODO tianyafu 运行Task
           val res = task.run(
             taskAttemptId = taskId,
             attemptNumber = taskDescription.attemptNumber,

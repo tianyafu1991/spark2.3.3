@@ -82,7 +82,7 @@ private[spark] class CoarseGrainedExecutorBackend(
     case RegisteredExecutor =>
       logInfo("Successfully registered with driver")
       try {
-        //创建Executor对象
+        //TODO tianyafu 创建Executor对象
         executor = new Executor(executorId, hostname, env, userClassPath, isLocal = false)
       } catch {
         case NonFatal(e) =>
@@ -100,7 +100,7 @@ private[spark] class CoarseGrainedExecutorBackend(
         //反序列化
         val taskDesc = TaskDescription.decode(data.value)
         logInfo("Got assigned task " + taskDesc.taskId)
-        // 交给executer去执行
+        //TODO  tianyafu 交给executer去执行
         executor.launchTask(this, taskDesc)
       }
 

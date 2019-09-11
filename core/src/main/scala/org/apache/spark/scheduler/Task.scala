@@ -72,6 +72,7 @@ private[spark] abstract class Task[T](
    * @param attemptNumber how many times this task has been attempted (0 for the first attempt)
    * @return the result of the task along with updates of Accumulators.
    */
+  //TODO tianyafu 执行Task的时候 线程会调用run方法
   final def run(
       taskAttemptId: Long,
       attemptNumber: Int,
@@ -106,6 +107,7 @@ private[spark] abstract class Task[T](
       Option(attemptNumber)).setCurrentContext()
 
     try {
+      //TODO tianyafu 具体运行Task 调用具体的SuffleMapTask或者ResultTask的runTask方法
       runTask(context)
     } catch {
       case e: Throwable =>
