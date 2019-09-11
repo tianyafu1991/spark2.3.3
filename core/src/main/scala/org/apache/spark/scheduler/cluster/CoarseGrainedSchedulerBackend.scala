@@ -118,11 +118,14 @@ class CoarseGrainedSchedulerBackend(scheduler: TaskSchedulerImpl, val rpcEnv: Rp
     }
 
     override def receive: PartialFunction[Any, Unit] = {
+      //TODO tianyafu 在CoarseGrainedExecutorBackend中通过DriverEndpoint的引用给DriverEndpoint发送消息 表示Executor中执行的Task的状态发生改变 例如：Task完成了
       case StatusUpdate(executorId, taskId, state, data) =>
+        //TODO tianyafu 调用TaskSchedulerImpl来处理Task的状态改变的消息
         scheduler.statusUpdate(taskId, state, data.value)
         if (TaskState.isFinished(state)) {
           executorDataMap.get(executorId) match {
             case Some(executorInfo) =>
+              //TODO 释放资源并重新任务分配
               executorInfo.freeCores += scheduler.CPUS_PER_TASK
               makeOffers(executorId)
             case None =>

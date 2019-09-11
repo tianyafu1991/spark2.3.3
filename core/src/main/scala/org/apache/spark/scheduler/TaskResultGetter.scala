@@ -54,6 +54,7 @@ private[spark] class TaskResultGetter(sparkEnv: SparkEnv, scheduler: TaskSchedul
     }
   }
 
+  //TODO task成功执行完成后调用
   def enqueueSuccessfulTask(
       taskSetManager: TaskSetManager,
       tid: Long,
@@ -61,6 +62,7 @@ private[spark] class TaskResultGetter(sparkEnv: SparkEnv, scheduler: TaskSchedul
     getTaskResultExecutor.execute(new Runnable {
       override def run(): Unit = Utils.logUncaughtExceptions {
         try {
+          //TODO 获取Task的执行结果
           val (result, size) = serializer.get().deserialize[TaskResult[_]](serializedData) match {
             case directResult: DirectTaskResult[_] =>
               if (!taskSetManager.canFetchMoreResults(serializedData.limit())) {
@@ -72,12 +74,14 @@ private[spark] class TaskResultGetter(sparkEnv: SparkEnv, scheduler: TaskSchedul
               directResult.value(taskResultSerializer.get())
               (directResult, serializedData.limit())
             case IndirectTaskResult(blockId, size) =>
-              if (!taskSetManager.canFetchMoreResults(size)) {
-                // dropped by executor if size is larger than maxResultSize
-                sparkEnv.blockManager.master.removeBlock(blockId)
+            if (!taskSetManager.canFetchMoreResults(size)) {
+              // dropped by executor if size is larger than maxResultSize
+              //TODO 如果Task的结果过大（超过1g）则BlockManager中移除这个block
+              sparkEnv.blockManager.master.removeBlock(blockId)
                 return
               }
               logDebug("Fetching indirect task result for TID %s".format(tid))
+              //TODO 如果可以获取到Result 那么久去获取
               scheduler.handleTaskGettingResult(taskSetManager, tid)
               val serializedTaskResult = sparkEnv.blockManager.getRemoteBytes(blockId)
               if (!serializedTaskResult.isDefined) {
@@ -88,6 +92,7 @@ private[spark] class TaskResultGetter(sparkEnv: SparkEnv, scheduler: TaskSchedul
                   taskSetManager, tid, TaskState.FINISHED, TaskResultLost)
                 return
               }
+              //TODO 获取到结果后反序列化
               val deserializedResult = serializer.get().deserialize[DirectTaskResult[_]](
                 serializedTaskResult.get.toByteBuffer)
               // force deserialization of referenced value
@@ -109,7 +114,7 @@ private[spark] class TaskResultGetter(sparkEnv: SparkEnv, scheduler: TaskSchedul
               a
             }
           }
-
+          //TODO 由TaskSchedulerImpl处理任务成功的消息 在该方法中 由TaskSetManager标记该Task为成功的并通知DAGScheduler该Task成功
           scheduler.handleSuccessfulTask(taskSetManager, tid, result)
         } catch {
           case cnf: ClassNotFoundException =>
@@ -123,7 +128,7 @@ private[spark] class TaskResultGetter(sparkEnv: SparkEnv, scheduler: TaskSchedul
       }
     })
   }
-
+//TODO Task失败后调用
   def enqueueFailedTask(taskSetManager: TaskSetManager, tid: Long, taskState: TaskState,
     serializedData: ByteBuffer) {
     var reason : TaskFailedReason = UnknownReason
@@ -147,6 +152,7 @@ private[spark] class TaskResultGetter(sparkEnv: SparkEnv, scheduler: TaskSchedul
             // If there's an error while deserializing the TaskEndReason, this Runnable
             // will die. Still tell the scheduler about the task failure, to avoid a hang
             // where the scheduler thinks the task is still running.
+            //TODO 调用TaskSchedulerImpl的方法 由TaskSetManager通知DAGScheduler该任务失败并根据一定的判断看是否需要重新调度该Task
             scheduler.handleFailedTask(taskSetManager, tid, taskState, reason)
           }
         }

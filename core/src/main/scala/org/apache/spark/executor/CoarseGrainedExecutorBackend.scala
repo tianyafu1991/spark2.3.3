@@ -145,10 +145,11 @@ private[spark] class CoarseGrainedExecutorBackend(
       logWarning(s"An unknown ($remoteAddress) driver disconnected.")
     }
   }
-
+//TODO tianyafu 当Executor中执行的Task的状态发生变化的时候 会调用该方法
   override def statusUpdate(taskId: Long, state: TaskState, data: ByteBuffer) {
     val msg = StatusUpdate(executorId, taskId, state, data)
     driver match {
+        //TODO 通过DriverEndpoint的引用给DriverEndpoint发送消息
       case Some(driverRef) => driverRef.send(msg)
       case None => logWarning(s"Drop $msg because has not yet connected to driver")
     }

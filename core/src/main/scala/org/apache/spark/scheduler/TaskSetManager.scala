@@ -768,6 +768,7 @@ private[spark] class TaskSetManager(
     // "result.value()" in "TaskResultGetter.enqueueSuccessfulTask" before reaching here.
     // Note: "result.value()" only deserializes the value when it's called at the first time, so
     // here "result.value()" just returns the value and won't block other threads.
+    //TODO tianyafu 通知DAGScheduler这个Task完成了
     sched.dagScheduler.taskEnded(tasks(index), Success, result.value(), result.accumUpdates, info)
     maybeFinishTaskSet()
   }
@@ -792,6 +793,7 @@ private[spark] class TaskSetManager(
    * Marks the task as failed, re-adds it to the list of pending tasks, and notifies the
    * DAG Scheduler.
    */
+  //TODO 处理Task失败的情况
   def handleFailedTask(tid: Long, state: TaskState, reason: TaskFailedReason) {
     val info = taskInfos(tid)
     if (info.failed || info.killed) {
@@ -867,7 +869,7 @@ private[spark] class TaskSetManager(
         logWarning(failureReason)
         None
     }
-
+    //TODO 通知DAGScheduler任务失败
     sched.dagScheduler.taskEnded(tasks(index), reason, null, accumUpdates, info)
 
     if (!isZombie && reason.countTowardsTaskFailures) {
@@ -890,6 +892,7 @@ private[spark] class TaskSetManager(
         s" so the previous stage needs to be re-run, or because a different copy of the task" +
         s" has already succeeded).")
     } else {
+      //TODO 将任务加入到等待调度的队列中
       addPendingTask(index)
     }
 

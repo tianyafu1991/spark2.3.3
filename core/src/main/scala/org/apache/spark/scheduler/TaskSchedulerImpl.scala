@@ -392,12 +392,13 @@ private[spark] class TaskSchedulerImpl(
   protected def shuffleOffers(offers: IndexedSeq[WorkerOffer]): IndexedSeq[WorkerOffer] = {
     Random.shuffle(offers)
   }
-
+//TODO 处理Task的状态改变的消息
   def statusUpdate(tid: Long, state: TaskState, serializedData: ByteBuffer) {
     var failedExecutor: Option[String] = None
     var reason: Option[ExecutorLossReason] = None
     synchronized {
       try {
+        //TODO 获取TaskSetManager
         Option(taskIdToTaskSetManager.get(tid)) match {
           case Some(taskSet) =>
             if (state == TaskState.LOST) {
@@ -416,8 +417,10 @@ private[spark] class TaskSchedulerImpl(
               cleanupTaskState(tid)
               taskSet.removeRunningTask(tid)
               if (state == TaskState.FINISHED) {
+                //TODO 如果Task是正常完成的 则获取Task的运行结果并由TaskSchedulerImpl调用TaskSetManager的方法来通知DAGScheduler该任务成功了
                 taskResultGetter.enqueueSuccessfulTask(taskSet, tid, serializedData)
               } else if (Set(TaskState.FAILED, TaskState.KILLED, TaskState.LOST).contains(state)) {
+                //TODO 任务是异常终止的  则获取Task的失败的原因并调用TaskSchedulerImpl的方法 由TaskSetManager通知DAGScheduler该任务失败并根据一定的判断看是否需要重新调度该Task
                 taskResultGetter.enqueueFailedTask(taskSet, tid, state, serializedData)
               }
             }
@@ -472,6 +475,7 @@ private[spark] class TaskSchedulerImpl(
     taskSetManager.handleSuccessfulTask(tid, taskResult)
   }
 
+  //TODO tianyafu 处理Task跑失败的情况
   def handleFailedTask(
       taskSetManager: TaskSetManager,
       tid: Long,
