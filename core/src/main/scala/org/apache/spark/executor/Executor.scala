@@ -292,7 +292,7 @@ private[spark] class Executor(
       notifyAll()
     }
 
-    // TODO tianyafu Executor执行Task 调用run方法
+    // TODO tianyafu Executor执行TaskRunner， 调用run方法
     override def run(): Unit = {
       threadId = Thread.currentThread.getId
       Thread.currentThread.setName(threadName)
@@ -304,6 +304,7 @@ private[spark] class Executor(
         threadMXBean.getCurrentThreadCpuTime
       } else 0L
       Thread.currentThread.setContextClassLoader(replClassLoader)
+      //TODO 获取反序列化器
       val ser = env.closureSerializer.newInstance()
       logInfo(s"Running $taskName (TID $taskId)")
       //给driver发信息改变任务的状态
@@ -316,8 +317,9 @@ private[spark] class Executor(
         // Must be set before updateDependencies() is called, in case fetching dependencies
         // requires access to properties contained within (e.g. for access control).
         Executor.taskDeserializationProps.set(taskDescription.properties)
-
+        //TODO 通过网络来获取需要的文件、jar
         updateDependencies(taskDescription.addedFiles, taskDescription.addedJars)
+        //TODO 反序列化Task
         task = ser.deserialize[Task[Any]](
           taskDescription.serializedTask, Thread.currentThread.getContextClassLoader)
         task.localProperties = taskDescription.properties
@@ -396,10 +398,10 @@ private[spark] class Executor(
 
         // If the task has been killed, let's fail it.
         task.context.killTaskIfInterrupted()
-
+        //TODO 获取序列化器
         val resultSer = env.serializer.newInstance()
         val beforeSerialization = System.currentTimeMillis()
-        val valueBytes = resultSer.serialize(value)
+        val valueBytes = resultSer.serialize(value)//TODO 将结果序列化
         val afterSerialization = System.currentTimeMillis()
 
         // Deserialization happens in two parts: first, we deserialize a Task object, which
@@ -459,6 +461,7 @@ private[spark] class Executor(
         // Note: accumulator updates must be collected after TaskMetrics is updated
         val accumUpdates = task.collectAccumulatorUpdates()
         // TODO: do not serialize value twice
+        //TODO 封装Task运行的结果和累加器的结果
         val directResult = new DirectTaskResult(valueBytes, accumUpdates)
         val serializedDirectResult = ser.serialize(directResult)
         val resultSize = serializedDirectResult.limit()
@@ -469,9 +472,11 @@ private[spark] class Executor(
             logWarning(s"Finished $taskName (TID $taskId). Result is larger than maxResultSize " +
               s"(${Utils.bytesToString(resultSize)} > ${Utils.bytesToString(maxResultSize)}), " +
               s"dropping it.")
+            //TODO TaskResult太大了（超过1g） 就直接把结果丢弃掉 只返回结果的大小
             ser.serialize(new IndirectTaskResult[Any](TaskResultBlockId(taskId), resultSize))
           } else if (resultSize > maxDirectResultSize) {
             val blockId = TaskResultBlockId(taskId)
+            //TODO 使用blockManager来存储结果
             env.blockManager.putBytes(
               blockId,
               new ChunkedByteBuffer(serializedDirectResult.duplicate()),
@@ -481,11 +486,13 @@ private[spark] class Executor(
             ser.serialize(new IndirectTaskResult[Any](blockId, resultSize))
           } else {
             logInfo(s"Finished $taskName (TID $taskId). $resultSize bytes result sent to driver")
+            //TODO 不用blockManager来管理TaskResult
             serializedDirectResult
           }
         }
 
         setTaskFinishedAndClearInterruptStatus()
+        //TODO tianyafu ExecutorBackend 向DriverEndpoint发送消息
         execBackend.statusUpdate(taskId, TaskState.FINISHED, serializedResult)
 
       } catch {
@@ -742,6 +749,7 @@ private[spark] class Executor(
    * Download any missing dependencies if we receive a new set of files and JARs from the
    * SparkContext. Also adds any new JARs we fetched to the class loader.
    */
+  //TODO tianyafu 通过网络来获取需要的文件、jar
   private def updateDependencies(newFiles: Map[String, Long], newJars: Map[String, Long]) {
     lazy val hadoopConf = SparkHadoopUtil.get.newConfiguration(conf)
     synchronized {

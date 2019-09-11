@@ -285,6 +285,7 @@ abstract class RDD[T: ClassTag](
     if (storageLevel != StorageLevel.NONE) {
       getOrCompute(split, context)
     } else {
+      //TODO 如果没有缓存 就查看是否有checkpoint 没有则直接进行计算
       computeOrReadCheckpoint(split, context)
     }
   }
@@ -321,6 +322,7 @@ abstract class RDD[T: ClassTag](
     if (isCheckpointedAndMaterialized) {
       firstParent[T].iterator(split, context)
     } else {
+      //TODO 没有checkpoint
       compute(split, context)
     }
   }
