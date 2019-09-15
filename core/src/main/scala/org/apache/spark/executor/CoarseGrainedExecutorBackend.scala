@@ -232,6 +232,7 @@ private[spark] object CoarseGrainedExecutorBackend extends Logging {
         SparkHadoopUtil.get.addDelegationTokens(tokens, driverConf)
       }
 
+      //TODO tianyafu 创建出Executor端的SparkEnv
       val env = SparkEnv.createExecutorEnv(
         driverConf, executorId, hostname, cores, cfg.ioEncryptionKey, isLocal = false)
       // TODO tianyafu 实例化CoarseGrainedExecutorBackend对象

@@ -113,7 +113,7 @@ private[spark] class ByteBufferBlockData(
  * Manager running on every node (driver and executors) which provides interfaces for putting and
  * retrieving blocks both locally and remotely into various stores (memory, disk, and off-heap).
  *
- * Note that [[initialize()]] must be called before the BlockManager is usable.
+ * Note that [[ initialize()]] must be called before the BlockManager is usable.
  */
 private[spark] class BlockManager(
     executorId: String,
@@ -224,7 +224,9 @@ private[spark] class BlockManager(
    * BlockManagerMaster, starts the BlockManagerWorker endpoint, and registers with a local shuffle
    * service if configured.
    */
+  //TODO  BlockManager的初始化
   def initialize(appId: String): Unit = {
+    //TODO blockTransformService是进行网络通信的
     blockTransferService.init(this)
     shuffleClient.init(appId)
 
@@ -236,10 +238,10 @@ private[spark] class BlockManager(
       logInfo(s"Using $priorityClass for block replication policy")
       ret
     }
-
+    //TODO blockManagerID
     val id =
       BlockManagerId(executorId, blockTransferService.hostName, blockTransferService.port, None)
-
+    //TODO tianyafu 向BlockManagerMasterEndpoint注册BlockManager
     val idFromMaster = master.registerBlockManager(
       id,
       maxOnHeapMemory,

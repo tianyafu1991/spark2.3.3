@@ -72,6 +72,7 @@ class BlockManagerMasterEndpoint(
   logInfo("BlockManagerMasterEndpoint up")
 
   override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
+    //TODO tianyafu 注册BlockManager 由BlockManagerMaster的registerBlockManager方法中调用而来
     case RegisterBlockManager(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, slaveEndpoint) =>
       context.reply(register(blockManagerId, maxOnHeapMemSize, maxOffHeapMemSize, slaveEndpoint))
 
@@ -352,6 +353,7 @@ class BlockManagerMasterEndpoint(
   /**
    * Returns the BlockManagerId with topology information populated, if available.
    */
+  //TODO tianyafu 注册BlockManager 返回一个带有拓扑信息的BlockManagerId
   private def register(
       idWithoutTopologyInfo: BlockManagerId,
       maxOnHeapMemSize: Long,
@@ -359,6 +361,7 @@ class BlockManagerMasterEndpoint(
       slaveEndpoint: RpcEndpointRef): BlockManagerId = {
     // the dummy id is not expected to contain the topology information.
     // we get that info here and respond back with a more fleshed out block manager id
+    //TODO tianyafu 生成一个带有拓扑信息的BlockmanagerId
     val id = BlockManagerId(
       idWithoutTopologyInfo.executorId,
       idWithoutTopologyInfo.host,

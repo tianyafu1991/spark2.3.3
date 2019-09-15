@@ -215,6 +215,7 @@ object SparkEnv extends Logging {
   /**
    * Helper method to create a SparkEnv for a driver or an executor.
    */
+  //TODO tianyafu 创建SparkEnv
   private def create(
       conf: SparkConf,
       executorId: String,
@@ -337,11 +338,11 @@ object SparkEnv extends Logging {
     } else {
       conf.get(BLOCK_MANAGER_PORT)
     }
-
+    //TODO tianyafu 网络通信的对象
     val blockTransferService =
       new NettyBlockTransferService(conf, securityManager, bindAddress, advertiseAddress,
         blockManagerPort, numUsableCores)
-
+    //TODO tianayfu 创建BlockManagerMaster并创建消息体BlockManagerMasterEndpoint
     val blockManagerMaster = new BlockManagerMaster(registerOrLookupEndpoint(
       BlockManagerMaster.DRIVER_ENDPOINT_NAME,
       new BlockManagerMasterEndpoint(rpcEnv, isLocal, conf, listenerBus)),

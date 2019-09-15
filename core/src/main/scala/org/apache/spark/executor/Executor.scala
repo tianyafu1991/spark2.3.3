@@ -114,6 +114,7 @@ private[spark] class Executor(
   private val taskReaperForTask: HashMap[Long, TaskReaper] = HashMap[Long, TaskReaper]()
 
   if (!isLocal) {
+    //TODO tianyafu 初始化BlockManager
     env.blockManager.initialize(conf.getAppId)
     env.metricsSystem.registerSource(executorSource)
     env.metricsSystem.registerSource(env.blockManager.shuffleMetricsSource)
