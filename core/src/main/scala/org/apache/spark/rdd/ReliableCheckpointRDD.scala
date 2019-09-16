@@ -118,6 +118,7 @@ private[spark] object ReliableCheckpointRDD extends Logging {
   /**
    * Write RDD to checkpoint files and return a ReliableCheckpointRDD representing the RDD.
    */
+  //TODO
   def writeRDDToCheckpointDirectory[T: ClassTag](
       originalRDD: RDD[T],
       checkpointDir: String,

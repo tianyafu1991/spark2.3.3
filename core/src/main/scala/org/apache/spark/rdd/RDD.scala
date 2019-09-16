@@ -1547,8 +1547,9 @@ abstract class RDD[T: ClassTag](
    * directory set with `SparkContext#setCheckpointDir` and all references to its parent
    * RDDs will be removed. This function must be called before any job has been
    * executed on this RDD. It is strongly recommended that this RDD is persisted in
-   * memory, otherwise saving it on a file will require recomputation.
+   * memory,   saving it on a file will require recomputation.
    */
+  //TODO tianyafu 这个方法只是标记该RDD需要被checkpoint
   def checkpoint(): Unit = RDDCheckpointData.synchronized {
     // NOTE: we use a global lock here due to complexities downstream with ensuring
     // children RDD partitions point to the correct parent partitions. In the future
