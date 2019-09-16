@@ -1482,10 +1482,12 @@ class SparkContext(config: SparkConf) extends Logging {
    * @param value value to broadcast to the Spark nodes
    * @return `Broadcast` object, a read-only variable cached on each machine
    */
+  //TODO tianyafu broadcast方法
   def broadcast[T: ClassTag](value: T): Broadcast[T] = {
     assertNotStopped()
     require(!classOf[RDD[_]].isAssignableFrom(classTag[T].runtimeClass),
       "Can not directly broadcast RDDs; instead, call collect() and broadcast the result.")
+    //TODO tianyafu 通过broadcastManager创建一个broadcast
     val bc = env.broadcastManager.newBroadcast[T](value, isLocal)
     val callSite = getCallSite
     logInfo("Created broadcast " + bc.id + " from " + callSite.shortForm)

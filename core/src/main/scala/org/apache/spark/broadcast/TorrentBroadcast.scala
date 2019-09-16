@@ -204,6 +204,7 @@ private[spark] class TorrentBroadcast[T: ClassTag](obj: T, id: Long)
     out.defaultWriteObject()
   }
 
+  //TODO tianyafu 读取broadcast的value
   private def readBroadcastBlock(): T = Utils.tryOrIOException {
     TorrentBroadcast.synchronized {
       val broadcastCache = SparkEnv.get.broadcastManager.cachedValues
@@ -217,23 +218,20 @@ private[spark] class TorrentBroadcast[T: ClassTag](obj: T, id: Long)
             if (blockResult.data.hasNext) {
               val x = blockResult.data.next().asInstanceOf[T]
               releaseLock(broadcastId)
-
               if (x != null) {
                 broadcastCache.put(broadcastId, x)
               }
-
               x
             } else {
               throw new SparkException(s"Failed to get locally stored broadcast data: $broadcastId")
             }
-            // 本地没找到
+            //TODO tianyafu 本地没找到
           case None =>
             logInfo("Started reading broadcast variable " + id)
             val startTimeMs = System.currentTimeMillis()
             //到Driver或其他Executor中远程fetch
             val blocks = readBlocks()
             logInfo("Reading broadcast variable " + id + " took" + Utils.getUsedTimeMs(startTimeMs))
-
             try {
               val obj = TorrentBroadcast.unBlockifyObject[T](
                 blocks.map(_.toInputStream()), SparkEnv.get.serializer, compressionCodec)
@@ -244,11 +242,9 @@ private[spark] class TorrentBroadcast[T: ClassTag](obj: T, id: Long)
               if (!blockManager.putSingle(broadcastId, obj, storageLevel, tellMaster = false)) {
                 throw new SparkException(s"Failed to store $broadcastId in BlockManager")
               }
-
               if (obj != null) {
                 broadcastCache.put(broadcastId, obj)
               }
-
               obj
             } finally {
               blocks.foreach(_.dispose())
