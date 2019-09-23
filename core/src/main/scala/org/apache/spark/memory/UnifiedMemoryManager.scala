@@ -106,19 +106,25 @@ private[spark] class UnifiedMemoryManager private[memory] (
      * attempts. Each attempt must be able to evict storage in case another task jumps in
      * and caches a large block between the attempts. This is called once per attempt.
      */
+    //TODO tianyafu 当Execution的内存空间不够的时候 会向storage去借 或者将storage占用Execution的空间回收回来
     def maybeGrowExecutionPool(extraMemoryNeeded: Long): Unit = {
       if (extraMemoryNeeded > 0) {
         // There is not enough free memory in the execution pool, so try to reclaim memory from
         // storage. We can reclaim any free memory from the storage pool. If the storage pool
         // has grown to become larger than `storageRegionSize`, we can evict blocks and reclaim
         // the memory that storage has borrowed from execution.
+        //TODO tianyafu 可以从storage中回收的内存空间  当storage中还有空间剩余时，就将空余空间借调给Execution ；
+        // 当storage实际所用空间已经超过本来分配的空间（即已经占用了Execution的空间时），就将占用的空间回收给Execution；
+        // 这里得出的memoryReclaimableFromStorage并不是最后实际从storage中回收（或者借调）的空间，下面的spaceToReclaim才是
         val memoryReclaimableFromStorage = math.max(
           storagePool.memoryFree,
           storagePool.poolSize - storageRegionSize)
         if (memoryReclaimableFromStorage > 0) {
           // Only reclaim as much space as is necessary and available:
+          //TODO tianyafu 这个就是按需回收 即如果最大可以回收100M 但本次实际只需要10M，那么就只回收10M
           val spaceToReclaim = storagePool.freeSpaceToShrinkPool(
             math.min(extraMemoryNeeded, memoryReclaimableFromStorage))
+          //TODO 从storage中回收会空间，storage占用的空间就要减掉，Execution可用的空间就要加上
           storagePool.decrementPoolSize(spaceToReclaim)
           executionPool.incrementPoolSize(spaceToReclaim)
         }
@@ -196,10 +202,12 @@ object UnifiedMemoryManager {
   private val RESERVED_SYSTEM_MEMORY_BYTES = 300 * 1024 * 1024
 
   def apply(conf: SparkConf, numCores: Int): UnifiedMemoryManager = {
+    //TODO tianyafu 获取Execution和storage可用的总内存大小
     val maxMemory = getMaxMemory(conf)
     new UnifiedMemoryManager(
       conf,
       maxHeapMemory = maxMemory,
+      //TODO tianyafu 默认storage的内存空间只占了Execution和storage可用的总内存的一半
       onHeapStorageRegionSize =
         (maxMemory * conf.getDouble("spark.memory.storageFraction", 0.5)).toLong,
       numCores = numCores)
@@ -208,10 +216,14 @@ object UnifiedMemoryManager {
   /**
    * Return the total amount of memory shared between execution and storage, in bytes.
    */
+  //TODO tianyafu 获取Execution和storage可用的总内存大小
   private def getMaxMemory(conf: SparkConf): Long = {
+    //TODO 获取系统内存
     val systemMemory = conf.getLong("spark.testing.memory", Runtime.getRuntime.maxMemory)
+    //TODO 获取保留内存
     val reservedMemory = conf.getLong("spark.testing.reservedMemory",
       if (conf.contains("spark.testing")) 0 else RESERVED_SYSTEM_MEMORY_BYTES)
+    //TODO 系统需要的最小内存
     val minSystemMemory = (reservedMemory * 1.5).ceil.toLong
     if (systemMemory < minSystemMemory) {
       throw new IllegalArgumentException(s"System memory $systemMemory must " +
@@ -227,8 +239,10 @@ object UnifiedMemoryManager {
           s"--executor-memory option or spark.executor.memory in Spark configuration.")
       }
     }
+    //TODO 总可用内存就是系统内存-保留内存
     val usableMemory = systemMemory - reservedMemory
     val memoryFraction = conf.getDouble("spark.memory.fraction", 0.6)
+    //TODO Execution和storage两者的总内存实际只占了总可用内存的0.6
     (usableMemory * memoryFraction).toLong
   }
 }
