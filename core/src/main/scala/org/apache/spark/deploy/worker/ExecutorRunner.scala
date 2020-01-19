@@ -152,7 +152,7 @@ private[deploy] class ExecutorRunner(
       val command = builder.command()
       val formattedCommand = command.asScala.mkString("\"", "\" \"", "\"")
       logInfo(s"Launch command: $formattedCommand")
-      //TODO 设置executor的目录
+      //TODO 设置executor的工作目录
       builder.directory(executorDir)
       builder.environment.put("SPARK_EXECUTOR_DIRS", appLocalDirs.mkString(File.pathSeparator))
       // In case we are running this from within the Spark Shell, avoid creating a "scala"
@@ -174,6 +174,7 @@ private[deploy] class ExecutorRunner(
         formattedCommand, "=" * 40)
 
       // Redirect its stdout and stderr to files
+      // TODO 重定向输出流到文件
       val stdout = new File(executorDir, "stdout")
       stdoutAppender = FileAppender(process.getInputStream, stdout, conf)
 

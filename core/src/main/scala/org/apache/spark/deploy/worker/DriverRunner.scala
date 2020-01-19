@@ -227,7 +227,7 @@ private[deploy] class DriverRunner(
         initialize(process.get)//将进程的输出重定向到具体的目录下
       }
       val processStart = clock.getTimeMillis()
-      //TODO 一直等待Driver进程知道退出并获取exitCode
+      //TODO 一直等待Driver进程直到退出并获取exitCode
       exitCode = process.get.waitFor()
       // check if attempting another run
       //TODO tianyafu 如果是设置了supervise并且上面的driver是异常退出的并且不是被主动kill的 就会进入下一次循环，则又会启动一个driver 这就是所谓的cluster模式下的故障恢复

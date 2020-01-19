@@ -33,6 +33,11 @@ import org.apache.spark.util.{AccumulatorV2, Clock, SystemClock, Utils}
 import org.apache.spark.util.collection.MedianHeap
 
 /**
+  * 在TaskSchedulerImpl中，对一个单独的TaskSet的任务进行调度，这个类负责追踪每一个Task，如果task失败的话，
+  * 会负责重试task，知道超过重试的次数限制，并且会通过延迟调度，为这个TaskSet处理本地化调度机制，他的主要接口
+  * 是resourceOffer，在这个接口中，TaskSet会希望在一个节点上运行一个任务，并且接受任务的状态改变消息，来知道他负责的task的状态改变了
+  */
+/**
  * Schedules the tasks within a single TaskSet in the TaskSchedulerImpl. This class keeps track of
  * each task, retries tasks if they fail (up to a limited number of times), and
  * handles locality-aware scheduling for this TaskSet via delay scheduling. The main interfaces

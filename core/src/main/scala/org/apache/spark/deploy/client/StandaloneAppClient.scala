@@ -96,6 +96,7 @@ private[spark] class StandaloneAppClient(
     /**
      *  Register with all masters asynchronously and returns an array `Future`s for cancellation.
      */
+    // TODO  将applicationDescription的信息发送给master
     private def tryRegisterAllMasters(): Array[JFuture[_]] = {
       for (masterAddress <- masterRpcAddresses) yield {
         registerMasterThreadPool.submit(new Runnable {
@@ -105,6 +106,7 @@ private[spark] class StandaloneAppClient(
             }
             logInfo("Connecting to master " + masterAddress.toSparkURL + "...")
             val masterRef = rpcEnv.setupEndpointRef(masterAddress, Master.ENDPOINT_NAME)
+            //TODO 将applicationDescription的信息发送给master
             masterRef.send(RegisterApplication(appDescription, self))
           } catch {
             case ie: InterruptedException => // Cancelled
@@ -121,6 +123,7 @@ private[spark] class StandaloneAppClient(
      *
      * nthRetry means this is the nth attempt to register with master.
      */
+    //TODO 调用tryRegisterAllMasters()方法向master发起请求，在该方法内部会将applicationDescription的信息发送给master
     private def registerWithMaster(nthRetry: Int) {
       registerMasterFutures.set(tryRegisterAllMasters())
       registrationRetryTimer.set(registrationRetryThread.schedule(new Runnable {

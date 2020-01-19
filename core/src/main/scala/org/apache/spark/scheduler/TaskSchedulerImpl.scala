@@ -183,7 +183,7 @@ private[spark] class TaskSchedulerImpl(
     val tasks = taskSet.tasks
     logInfo("Adding task set " + taskSet.id + " with " + tasks.length + " tasks")
     this.synchronized {
-      //TODO tianyafu 创建一个TaskSetManager
+      //TODO tianyafu 给每个TaskSet都会创建一个TaskSetManager
       val manager = createTaskSetManager(taskSet, maxTaskFailures)
       val stage = taskSet.stageId
       val stageTaskSets =
@@ -282,19 +282,26 @@ private[spark] class TaskSchedulerImpl(
     var launchedTask = false
     // nodes and executors that are blacklisted for the entire application have already been
     // filtered out by this point
+    //TODO tianyafu 遍历所有的executor
     for (i <- 0 until shuffledOffers.size) {
       val execId = shuffledOffers(i).executorId
       val host = shuffledOffers(i).host
       if (availableCpus(i) >= CPUS_PER_TASK) {//这个Worker的CPU符合就可以分配资源
         try {
+          //TODO tianyafu 调用TaskSetManager的resourceOffer方法，去找到在这个executor上，用这种本地化级别，taskSet中哪些task可以启动
           for (task <- taskSet.resourceOffer(execId, host, maxLocality)) {
+            //TODO 在这个executor上可以启动的task，放入这个tasks数据结构中
+            // ，到这里为止，其实就是task分配算法的实现了，我们尝试着用这种本地化级别的模型，去优化task的分配和启动
+            // ，优先希望在最佳本地化的地方启动task，然后将task分配给executor
             tasks(i) += task
+            //将相应的分配信息加入到内存缓存中
             val tid = task.taskId
             taskIdToTaskSetManager.put(tid, taskSet)
             taskIdToExecutorId(tid) = execId
             executorIdToRunningTaskIds(execId).add(tid)
             availableCpus(i) -= CPUS_PER_TASK
             assert(availableCpus(i) >= 0)
+            //TODO 返回true，这样，外面的do while就又会进来调用这个方法继续分配task
             launchedTask = true
           }
         } catch {
@@ -348,9 +355,10 @@ private[spark] class TaskSchedulerImpl(
     //TODO tianyafu 把executor打散，主要是为了计算资源的分配负载均衡
     val shuffledOffers = shuffleOffers(filteredOffers)
     // Build a list of tasks to assign to each worker.
-    //每个workOffer生成一个ArrayBuffer对象，大小为o.cores / CPUS_PER_TASK
+    //TODO tianyafu 每个workOffer生成一个ArrayBuffer对象，大小为o.cores / CPUS_PER_TASK
     val tasks = shuffledOffers.map(o => new ArrayBuffer[TaskDescription](o.cores / CPUS_PER_TASK))
     val availableCpus = shuffledOffers.map(o => o.cores).toArray
+    //TODO 从调度池中取出排好队的TaskSetManager
     val sortedTaskSets = rootPool.getSortedTaskSetQueue
     for (taskSet <- sortedTaskSets) {
       logDebug("parentName: %s, name: %s, runningTasks: %s".format(
@@ -368,6 +376,8 @@ private[spark] class TaskSchedulerImpl(
       var launchedAnyTask = false
       var launchedTaskAtCurrentMaxLocality = false
       for (currentMaxLocality <- taskSet.myLocalityLevels) {
+        //TODO 尝试着遍历taskSet中task可用的本地化级别，以优先最大化本地性的原则，尝试在对应的executor上分配相应的task
+        // ，直到该本地化级别无法满足了，再降级下一个本地化级别继续分配
         do {
           launchedTaskAtCurrentMaxLocality = resourceOfferSingleTaskSet(
             taskSet, currentMaxLocality, shuffledOffers, availableCpus, tasks)

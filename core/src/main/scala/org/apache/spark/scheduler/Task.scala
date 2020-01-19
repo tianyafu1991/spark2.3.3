@@ -72,12 +72,13 @@ private[spark] abstract class Task[T](
    * @param attemptNumber how many times this task has been attempted (0 for the first attempt)
    * @return the result of the task along with updates of Accumulators.
    */
-  //TODO tianyafu 执行Task的时候 线程会调用run方法
+  //TODO tianyafu 执行Task的时候 调用run方法
   final def run(
       taskAttemptId: Long,
       attemptNumber: Int,
       metricsSystem: MetricsSystem): T = {
     SparkEnv.get.blockManager.registerTask(taskAttemptId)
+    //TODO tianyafu 创建了task的执行上下文，里面包括记录了task的重试次数 ，task属于哪个stage，task对应的rdd的哪个partition等等
     context = new TaskContextImpl(
       stageId,
       stageAttemptId, // stageAttemptId and stageAttemptNumber are semantically equal

@@ -37,6 +37,16 @@ import org.apache.spark.scheduler.cluster.CoarseGrainedClusterMessages._
 import org.apache.spark.serializer.SerializerInstance
 import org.apache.spark.util.{ThreadUtils, Utils}
 
+/**
+  * ExecutorRunner通过processBuilder启动的Executor进程，实际上就是这个CoarseGrainedExecutorBackend
+  * @param rpcEnv
+  * @param driverUrl
+  * @param executorId
+  * @param hostname
+  * @param cores
+  * @param userClassPath
+  * @param env
+  */
 private[spark] class CoarseGrainedExecutorBackend(
     override val rpcEnv: RpcEnv,
     driverUrl: String,
@@ -82,7 +92,7 @@ private[spark] class CoarseGrainedExecutorBackend(
     case RegisteredExecutor =>
       logInfo("Successfully registered with driver")
       try {
-        //TODO tianyafu 创建Executor对象
+        //TODO tianyafu 创建Executor对象作为执行句柄，其实CoarseGrainedSchedulerBackend的大部分功能，都是通过Executor这个对象实现的
         executor = new Executor(executorId, hostname, env, userClassPath, isLocal = false)
       } catch {
         case NonFatal(e) =>

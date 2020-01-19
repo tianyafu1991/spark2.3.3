@@ -317,7 +317,7 @@ private[deploy] class Master(
         case None =>
           logWarning(s"Got status update for unknown executor $appId/$execId")
       }
-//TODO tianyafu Driver状态发生改变
+//TODO tianyafu Driver状态发生改变，Driver的状态改变之后还是需要去调用schedule()方法，因为Driver完成之后有新的资源被释放了
     case DriverStateChanged(driverId, state, exception) =>
       state match {
         case DriverState.ERROR | DriverState.FINISHED | DriverState.KILLED | DriverState.FAILED =>
@@ -568,6 +568,7 @@ private[deploy] class Master(
     }
 
     state = RecoveryState.ALIVE
+    //TODO tianyafu 这个方法非常重要
     schedule()
     logInfo("Recovery complete - resuming operations!")
   }
@@ -681,10 +682,10 @@ private[deploy] class Master(
     for (app <- waitingApps) {
       val coresPerExecutor = app.desc.coresPerExecutor.getOrElse(1)
       // If the cores left is less than the coresPerExecutor,the cores left will not be allocated
-      //TODO tianyafu 如果剩余可用的core已经小于该应用单个Executor所需要的core的话 该application是无法调度的
+      //TODO tianyafu 如果一个application还有core需要分配（即前一次调度没有足够的资源了 导致这个application没有分配到所需的Executor）
       if (app.coresLeft >= coresPerExecutor) {
         // Filter out workers that don't have enough resources to launch an executor
-        //TODO tianyafu 对于资源没有达到app的所需时 过滤掉该worker
+        //TODO tianyafu 先过滤掉worker状态不为alive的，对于资源没有达到app的所需时 过滤掉该worker，然后根据worker剩余core的数量倒序排序
         val usableWorkers = workers.toArray.filter(_.state == WorkerState.ALIVE)
           .filter(worker => worker.memoryFree >= app.desc.memoryPerExecutorMB &&
             worker.coresFree >= coresPerExecutor)
@@ -742,10 +743,12 @@ private[deploy] class Master(
       return
     }
     // Drivers take strict precedence over executors
-    //打散活着的worker
+    //随机打散活着的worker
     val shuffledAliveWorkers = Random.shuffle(workers.toSeq.filter(_.state == WorkerState.ALIVE))
     val numWorkersAlive = shuffledAliveWorkers.size
     var curPos = 0
+    //TODO 只有yarn-cluster模式提交的时候，才会注册driver，
+    // 因为standalone、yarn-client模式都会在本地直接启动driver，而不会来注册driver，就更不可能让master调度driver了
     for (driver <- waitingDrivers.toList) { // iterate over a copy of waitingDrivers
       // We assign workers to each waiting driver in a round-robin fashion. For each driver, we
       // start from the last worker that was assigned a driver, and continue onwards until we have
@@ -1037,7 +1040,9 @@ private[deploy] class Master(
 //TODO tianyafu master(实际是worker的消息通信对象)发送指令远程让worker启动driver
   private def launchDriver(worker: WorkerInfo, driver: DriverInfo) {
     logInfo("Launching driver " + driver.id + " on worker " + worker.id)
+    //将worker内已使用的内存和cpu数量 都加上driver需要的内存和cpu数量，并将driver加到worker的内存缓存结构中
     worker.addDriver(driver)
+    //把worker也加入到driver的内存缓存结构中，以便达到互相引用
     driver.worker = Some(worker)
     //发送指令
     worker.endpoint.send(LaunchDriver(driver.id, driver.desc))
@@ -1048,19 +1053,24 @@ private[deploy] class Master(
       driverId: String,
       finalState: DriverState,
       exception: Option[Exception]) {
+    //找到状态发生改变的Driver
     drivers.find(d => d.id == driverId) match {
       case Some(driver) =>
         logInfo(s"Removing driver: $driverId")
+        //从内存缓存结构中移除
         drivers -= driver
         if (completedDrivers.size >= RETAINED_DRIVERS) {
           val toRemove = math.max(RETAINED_DRIVERS / 10, 1)
           completedDrivers.trimStart(toRemove)
         }
         completedDrivers += driver
+        //从持久化中移除
         persistenceEngine.removeDriver(driver)
         driver.state = finalState
         driver.exception = exception
+        //将内存缓存中的work的信息重新计算，主要是移除了Driver原先占用的资源
         driver.worker.foreach(w => w.removeDriver(driver))
+        //继续调用schedule()方法，因为有新的资源被释放出来
         schedule()
       case None =>
         logWarning(s"Asked to remove unknown driver: $driverId")

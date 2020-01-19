@@ -487,6 +487,7 @@ private[deploy] class Worker(
           logInfo("Asked to launch executor %s/%d for %s".format(appId, execId, appDesc.name))
 
           // Create the executor's working directory
+          //创建工作目录
           val executorDir = new File(workDir, appId + "/" + execId)
           if (!executorDir.mkdirs()) {
             throw new IOException("Failed to create directory " + executorDir)
@@ -594,7 +595,8 @@ private[deploy] class Worker(
         case None =>
           logError(s"Asked to kill unknown driver $driverId")
       }
-
+    //TODO Driver执行完之后，DriverRunner线程会发送driverStateChanged给worker，
+    // worker实际上会将driverStateChanged的消息发送给master，master会进行状态改变处理
     case driverStateChanged @ DriverStateChanged(driverId, state, exception) =>
       handleDriverStateChanged(driverStateChanged)
 
@@ -712,10 +714,13 @@ private[deploy] class Worker(
       case _ =>
         logDebug(s"Driver $driverId changed state to $state")
     }
+    //TODO 将driverStateChanged的消息发送给master，master会进行状态改变处理
     sendToMaster(driverStateChanged)
+    //将Driver从worker的本地缓存中移除
     val driver = drivers.remove(driverId).get
     finishedDrivers(driverId) = driver
     trimFinishedDriversIfNecessary()
+    //释放掉已完成的Driver所占用的资源
     memoryUsed -= driver.driverDesc.mem
     coresUsed -= driver.driverDesc.cores
   }
