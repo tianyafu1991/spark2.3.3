@@ -110,6 +110,7 @@ private[spark] class ByteBufferBlockData(
 }
 
 /**
+  * //TODO tianyafu  blockManager在每个driver和executor上都有，主要提供了本地和远程的存储数据的功能，支持内存、磁盘、堆外内存
  * Manager running on every node (driver and executors) which provides interfaces for putting and
  * retrieving blocks both locally and remotely into various stores (memory, disk, and off-heap).
  *
@@ -594,20 +595,21 @@ private[spark] class BlockManager(
    * Must be called while holding a read lock on the block.
    * Releases the read lock upon exception; keeps the read lock upon successful return.
    */
+  //TODO tianyafu 从本地读取数据
   private def doGetLocalBytes(blockId: BlockId, info: BlockInfo): BlockData = {
     val level = info.level
     logDebug(s"Level for block $blockId is $level")
     // In order, try to read the serialized bytes from memory, then from disk, then fall back to
     // serializing in-memory objects, and, finally, throw an exception if the block does not exist.
-    if (level.deserialized) {
+    if (level.deserialized) { //TODO 持久化级别为未序列化的
       // Try to avoid expensive serialization by reading a pre-serialized copy from disk:
-      if (level.useDisk && diskStore.contains(blockId)) {
+      if (level.useDisk && diskStore.contains(blockId)) { //TODO 从磁盘中读取
         // Note: we purposely do not try to put the block back into memory here. Since this branch
         // handles deserialized blocks, this block may only be cached in memory as objects, not
         // serialized bytes. Because the caller only requested bytes, it doesn't make sense to
         // cache the block's deserialized objects since that caching may not have a payoff.
         diskStore.getBytes(blockId)
-      } else if (level.useMemory && memoryStore.contains(blockId)) {
+      } else if (level.useMemory && memoryStore.contains(blockId)) { //TODO 从内存中读取
         // The block was not found on disk, so serialize an in-memory copy:
         new ByteBufferBlockData(serializerManager.dataSerializeWithExplicitClassTag(
           blockId, memoryStore.getValues(blockId).get, info.classTag), true)
@@ -633,6 +635,7 @@ private[spark] class BlockManager(
    *
    * This does not acquire a lock on this block in this JVM.
    */
+  //TODO tianyafu 从远程获取block的数据
   private def getRemoteValues[T: ClassTag](blockId: BlockId): Option[BlockResult] = {
     val ct = implicitly[ClassTag[T]]
     getRemoteBytes(blockId).map { data =>
