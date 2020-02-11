@@ -39,6 +39,7 @@ class SocketInputDStream[T: ClassTag](
     storageLevel: StorageLevel
   ) extends ReceiverInputDStream[T](_ssc) {
 
+  //TODO tianyafu 输入Dstream，有这个getReceiver()方法，用来负责返回Dstream的Receiver
   def getReceiver(): Receiver[T] = {
     new SocketReceiver(host, port, bytesToObjects, storageLevel)
   }

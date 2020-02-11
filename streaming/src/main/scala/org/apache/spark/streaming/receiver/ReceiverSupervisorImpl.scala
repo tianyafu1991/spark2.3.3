@@ -171,6 +171,8 @@ private[streaming] class ReceiverSupervisorImpl(
   }
 
   override protected def onStart() {
+    //TODO tianyafu 启动BlockGenerator，非常非常重要的组件，后面，数据接收的时候，
+    // 就是它运行在Worker的executor端负责数据接收后的一些存取工作以及配合ReceiverTracker
     registeredBlockGenerators.asScala.foreach { _.start() }
   }
 
@@ -185,6 +187,7 @@ private[streaming] class ReceiverSupervisorImpl(
     env.rpcEnv.stop(endpoint)
   }
 
+  //TODO tianyafu 利用ReceiverTrackerEndpoint向ReceiverTracker发送注册Receiver的信息
   override protected def onReceiverStart(): Boolean = {
     val msg = RegisterReceiver(
       streamId, receiver.getClass.getSimpleName, host, executorId, endpoint)

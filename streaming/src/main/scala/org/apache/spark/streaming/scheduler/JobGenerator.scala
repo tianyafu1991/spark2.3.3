@@ -97,6 +97,7 @@ class JobGenerator(jobScheduler: JobScheduler) extends Logging {
     if (ssc.isCheckpointPresent) {
       restart()
     } else {
+      //首次启动
       startFirstTime()
     }
   }
@@ -189,6 +190,8 @@ class JobGenerator(jobScheduler: JobScheduler) extends Logging {
   }
 
   /** Starts the generator for the first time */
+  //TODO tianyafu 只要JobGenerator一启动，这里就会初始化一个开始时间，后面的话，根据我们自己设置的batch interval，每到一个batch interval，
+  // 都会从上一个time ，也就是这里的startTime开始将batch interval内的数据封装为一个batch
   private def startFirstTime() {
     val startTime = new Time(timer.getStartTime())
     graph.start(startTime - graph.batchDuration)

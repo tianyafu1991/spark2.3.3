@@ -44,6 +44,8 @@ class ForEachDStream[T: ClassTag] (
 
   override def compute(validTime: Time): Option[RDD[Unit]] = None
 
+  //TODO tianyafu 所有的output操作，其实都会来调用ForEachDStream的generatorJob()方法，所以说，每次执行DStreamGraph的时候，
+  // 到了最后，都会调用到这里，然后底层就回去触发job的提交
   override def generateJob(time: Time): Option[Job] = {
     parent.getOrCompute(time) match {
       case Some(rdd) =>

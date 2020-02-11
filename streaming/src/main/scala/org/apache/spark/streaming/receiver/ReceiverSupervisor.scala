@@ -141,11 +141,15 @@ private[streaming] abstract class ReceiverSupervisor(
   }
 
   /** Start receiver */
+  //TODO tianyafu 启动receiver
   def startReceiver(): Unit = synchronized {
     try {
+      //TODO tianyafu 在onReceiverStart()中，利用ReceiverTrackerEndpoint向ReceiverTracker发送注册Receiver的信息
       if (onReceiverStart()) {
         logInfo(s"Starting receiver $streamId")
         receiverState = Started
+        //TODO tianyafu 当向ReceiverTracker注册Receiver成功后，调用receiver.onStart()
+        // 在Executor启动Receiver不断接受数据，并将接收的数据交给BlockManager管理
         receiver.onStart()
         logInfo(s"Called receiver $streamId onStart")
       } else {

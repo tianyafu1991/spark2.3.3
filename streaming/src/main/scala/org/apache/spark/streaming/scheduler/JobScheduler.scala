@@ -52,6 +52,7 @@ class JobScheduler(val ssc: StreamingContext) extends Logging {
   private val numConcurrentJobs = ssc.conf.getInt("spark.streaming.concurrentJobs", 1)
   private val jobExecutor =
     ThreadUtils.newDaemonFixedThreadPool(numConcurrentJobs, "streaming-job-executor")
+  //TODO tianyafu 创建JobGenerator
   private val jobGenerator = new JobGenerator(this)
   val clock = jobGenerator.clock
   val listenerBus = new StreamingListenerBus(ssc.sparkContext.listenerBus)
@@ -66,6 +67,7 @@ class JobScheduler(val ssc: StreamingContext) extends Logging {
 
   private var eventLoop: EventLoop[JobSchedulerEvent] = null
 
+  //TODO tianyafu StreamingContext的start其实最重要的就是调用JobScheduler的start方法
   def start(): Unit = synchronized {
     if (eventLoop != null) return // scheduler has already been started
 
@@ -84,6 +86,7 @@ class JobScheduler(val ssc: StreamingContext) extends Logging {
     } ssc.addStreamingListener(rateController)
 
     listenerBus.start()
+    //TODO tianyafu 创建ReceiverTracker组件 这是重量级的组件 数据接收相关
     receiverTracker = new ReceiverTracker(ssc)
     inputInfoTracker = new InputInfoTracker(ssc)
 
@@ -99,7 +102,10 @@ class JobScheduler(val ssc: StreamingContext) extends Logging {
       ssc.graph.batchDuration.milliseconds,
       clock)
     executorAllocationManager.foreach(ssc.addStreamingListener)
+    //TODO tianyafu 调用ReceiverTracker的start方法来启动ReceiverTracker，
+    // 然后就是启动输入DStream关联的Receiver了，逻辑都在ReceiverTracker的start方法中
     receiverTracker.start()
+    //TODO tianyafu 调用JobGenerator的start方法来启动JobGenerator
     jobGenerator.start()
     executorAllocationManager.foreach(_.start())
     logInfo("Started JobScheduler")

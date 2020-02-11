@@ -66,7 +66,7 @@ abstract class ReceiverInputDStream[T: ClassTag](_ssc: StreamingContext)
 
   /**
    * Generates RDDs with blocks received by the receiver of this stream. */
-  override def compute(validTime: Time): Option[RDD[T]] = {
+    override def compute(validTime: Time): Option[RDD[T]] = {
     val blockRDD = {
 
       if (validTime < graph.startTime) {

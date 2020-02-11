@@ -149,14 +149,17 @@ class ReceiverTracker(ssc: StreamingContext, skipReceiverLaunch: Boolean = false
   private val receiverPreferredLocations = new HashMap[Int, Option[String]]
 
   /** Start the endpoint and receiver execution thread. */
+  //TODO tianyafu 这个start方法中，通过调用launchReceivers()方法，来启动receiver
   def start(): Unit = synchronized {
     if (isTrackerStarted) {
       throw new SparkException("ReceiverTracker already started")
     }
 
     if (!receiverInputStreams.isEmpty) {
+      //TODO tianyafu  创建一个ReceiverTrackerEndpoint 并将ReceiverTrackerEndpoint注册给rpcEnv
       endpoint = ssc.env.rpcEnv.setupEndpoint(
         "ReceiverTracker", new ReceiverTrackerEndpoint(ssc.env.rpcEnv))
+      //TODO tianyafu 调用launchReceivers  方法来启动receiver
       if (!skipReceiverLaunch) launchReceivers()
       logInfo("ReceiverTracker started")
       trackerState = Started
@@ -437,15 +440,20 @@ class ReceiverTracker(ssc: StreamingContext, skipReceiverLaunch: Boolean = false
    * worker nodes as a parallel collection, and runs them.
    */
   private def launchReceivers(): Unit = {
+    //TODO tianyafu 这个receiverInputStreams就是从StreamingContext的DStreamGraph里面取出来的，
+    // 每次调用StreamingContext创建一个输入DStream时，都会放入DStreamGraph的ReceiverInputStreams中去
+    //获取到每个InputStream的receiver，形成一个Receiver集合
     val receivers = receiverInputStreams.map { nis =>
       val rcvr = nis.getReceiver()
       rcvr.setReceiverId(nis.id)
       rcvr
     }
-
+    //执行一次假的spark任务 这里其实是真执行 只是不是我们的spark streaming的job
+    // 这样来保证所有的worker都已经来注册了 防止receiver被调度到同一个worker上
     runDummySparkJob()
 
     logInfo("Starting " + receivers.length + " receivers")
+    //TODO tianyafu ReceiverTrackerEndpoint发送StartAllReceivers消息
     endpoint.send(StartAllReceivers(receivers))
   }
 
@@ -468,12 +476,14 @@ class ReceiverTracker(ssc: StreamingContext, skipReceiverLaunch: Boolean = false
 
     override def receive: PartialFunction[Any, Unit] = {
       // Local messages
+      //TODO tianyafu  ReceiverTrackerEndpoint接收到StartAllReceivers的消息
       case StartAllReceivers(receivers) =>
         val scheduledLocations = schedulingPolicy.scheduleReceivers(receivers, getExecutors)
         for (receiver <- receivers) {
           val executors = scheduledLocations(receiver.streamId)
           updateReceiverScheduledExecutors(receiver.streamId, executors)
           receiverPreferredLocations(receiver.streamId) = receiver.preferredLocation
+          //TODO tianyafu 在具体的Executor上启动Receiver
           startReceiver(receiver, executors)
         }
       case RestartReceiver(receiver) =>
@@ -567,6 +577,7 @@ class ReceiverTracker(ssc: StreamingContext, skipReceiverLaunch: Boolean = false
     /**
      * Start a receiver along with its scheduled executors
      */
+    //TODO tianyafu 在具体的Executor上启动Receiver
     private def startReceiver(
         receiver: Receiver[_],
         scheduledLocations: Seq[TaskLocation]): Unit = {
@@ -586,6 +597,7 @@ class ReceiverTracker(ssc: StreamingContext, skipReceiverLaunch: Boolean = false
         new SerializableConfiguration(ssc.sparkContext.hadoopConfiguration)
 
       // Function to start the receiver on the worker node
+      //TODO 这里只是定义了启动receiver的核心逻辑，只是定义了一个启动函数，不是真正的启动Receiver
       val startReceiverFunc: Iterator[Receiver[_]] => Unit =
         (iterator: Iterator[Receiver[_]]) => {
           if (!iterator.hasNext) {
@@ -595,8 +607,10 @@ class ReceiverTracker(ssc: StreamingContext, skipReceiverLaunch: Boolean = false
           if (TaskContext.get().attemptNumber() == 0) {
             val receiver = iterator.next()
             assert(iterator.hasNext == false)
+            //TODO tianyafu 将每一个Receiver封装在ReceiverSupervisorImpl中，并调用ReceiverSupervisorImpl的start()方法来启动Receiver
             val supervisor = new ReceiverSupervisorImpl(
               receiver, SparkEnv.get, serializableHadoopConf.value, checkpointDirOption)
+            //TODO tianyafu  启动BlockGenerator并启动Receiver
             supervisor.start()
             supervisor.awaitTermination()
           } else {
@@ -615,7 +629,7 @@ class ReceiverTracker(ssc: StreamingContext, skipReceiverLaunch: Boolean = false
       receiverRDD.setName(s"Receiver $receiverId")
       ssc.sparkContext.setJobDescription(s"Streaming job running receiver $receiverId")
       ssc.sparkContext.setCallSite(Option(ssc.getStartSite()).getOrElse(Utils.getCallSite()))
-
+      //TODO tianyafu 这里才是真正的去执行启动函数，将Receiver分布到各个worker的executor上去执行
       val future = ssc.sparkContext.submitJob[Receiver[_], Unit, Unit](
         receiverRDD, startReceiverFunc, Seq(0), (_, _) => Unit, ())
       // We will keep restarting the receiver job until ReceiverTracker is stopped

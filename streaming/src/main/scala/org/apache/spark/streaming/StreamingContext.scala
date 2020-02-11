@@ -153,6 +153,7 @@ class StreamingContext private[streaming] (
 
   private[streaming] val env = sc.env
 
+  //TODO tianyafu 很重要的组件，这个组件里面保存了我们定义的Spark Streaming Application中，一些列的Dstream的依赖关系以及互相之间的算子的应用
   private[streaming] val graph: DStreamGraph = {
     if (isCheckpointPresent) {
       _cp.graph.setContext(this)
@@ -181,6 +182,9 @@ class StreamingContext private[streaming] (
     if (isCheckpointPresent) _cp.checkpointDuration else graph.batchDuration
   }
 
+  //TODO tianyafu 非常重要的一个组件，涉及到job的调度 JobGenerator会负责每隔batch interval，生成一个job，然后通过JobScheduler来调度和提交job，
+  // 底层，其实还是基于spark的核心计算引擎，底层DAGScheduler、TaskScheduler、Worker、Executor、Task等等，如果你定义了reduceByKey这种算子，
+  // 还是会有shuffle，底层的数据存取组件 还是executor先关联的BlockManager
   private[streaming] val scheduler = new JobScheduler(this)
 
   private[streaming] val waiter = new ContextWaiter
@@ -563,6 +567,8 @@ class StreamingContext private[streaming] (
    *
    * @throws IllegalStateException if the StreamingContext is already stopped.
    */
+  //TODO tianyafu 这个方法里面会创建StreamingContext极为重要的两个组件：ReceiverTracker和JobGenerator,
+  // 并启动整个spark Streaming应用程序的输入DStream的Receiver，就是在某个Worker上的Executor上启动这个 Receiver
   def start(): Unit = synchronized {
     state match {
       case INITIALIZED =>
@@ -580,6 +586,7 @@ class StreamingContext private[streaming] (
               sparkContext.clearJobGroup()
               sparkContext.setLocalProperty(SparkContext.SPARK_JOB_INTERRUPT_ON_CANCEL, "false")
               savedProperties.set(SerializationUtils.clone(sparkContext.localProperties.get()))
+              //TODO tianyafu 最重要的就是调用这个JobScheduler的start方法
               scheduler.start()
             }
             state = StreamingContextState.ACTIVE
