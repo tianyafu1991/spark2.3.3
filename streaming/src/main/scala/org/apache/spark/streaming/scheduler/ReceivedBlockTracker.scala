@@ -70,10 +70,13 @@ private[streaming] class ReceivedBlockTracker(
     checkpointDirOption: Option[String])
   extends Logging {
 
+  //存储了block元数据信息的队列
   private type ReceivedBlockQueue = mutable.Queue[ReceivedBlockInfo]
-
+//TODO tianyafu 封装了streamId到block的映射
   private val streamIdToUnallocatedBlockQueues = new mutable.HashMap[Int, ReceivedBlockQueue]
+  //TODO tianyafu  封装了time到block的映射
   private val timeToAllocatedBlocks = new mutable.HashMap[Time, AllocatedBlocks]
+  //TODO tianyafu 如果开启了预写日志机制 该方法就会生成预写日志的 Manager
   private val writeAheadLogOption = createWriteAheadLog()
 
   private var lastAllocatedBatchTime: Time = null

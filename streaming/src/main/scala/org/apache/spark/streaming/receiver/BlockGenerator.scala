@@ -100,15 +100,20 @@ private[streaming] class BlockGenerator(
   }
   import GeneratorState._
 
+  //TODO tianyafu blockInterval,是有一个默认值的，这个参数可以用来调优
   private val blockIntervalMs = conf.getTimeAsMs("spark.streaming.blockInterval", "200ms")
   require(blockIntervalMs > 0, s"'spark.streaming.blockInterval' should be a positive value")
 
+  //TODO tianyafu 这个Timer就是每隔200ms就会去调用一下updateCurrentBuffer这个函数
   private val blockIntervalTimer =
     new RecurringTimer(clock, blockIntervalMs, updateCurrentBuffer, "BlockGenerator")
   private val blockQueueSize = conf.getInt("spark.streaming.blockQueueSize", 10)
+  //TODO tianyafu 这里的blocksForPushing的长度是可以通过上面这个参数进行调优的
   private val blocksForPushing = new ArrayBlockingQueue[Block](blockQueueSize)
+  //TODO blockPushingThread 后台线程，启动之后，就会调用keepPushingBlocks方法，这个方法中，就会每隔一段时间去blocksForPushing中取block
   private val blockPushingThread = new Thread() { override def run() { keepPushingBlocks() } }
 
+  //TODO tianyafu 这个currentBuffer就是用于存放原始的数据
   @volatile private var currentBuffer = new ArrayBuffer[Any]
   @volatile private var state = Initialized
 
@@ -116,6 +121,9 @@ private[streaming] class BlockGenerator(
   def start(): Unit = synchronized {
     if (state == Initialized) {
       state = Active
+      //TODO tianyafu 其实就是启动内部的两个关键后台线程，
+      // 一个是bolckIntervalTimer，负责将currentBuffer中的原始数据，打包成一个一个的block，
+      // 一个是blockPushingThread，负责将blockForPushing中的block，调用pushArrayBuffer()方法
       blockIntervalTimer.start()
       blockPushingThread.start()
       logInfo("Started BlockGenerator")
@@ -235,15 +243,19 @@ private[streaming] class BlockGenerator(
       var newBlock: Block = null
       synchronized {
         if (currentBuffer.nonEmpty) {
+          //TODO tianyafu 创建一个新的buffer
           val newBlockBuffer = currentBuffer
           currentBuffer = new ArrayBuffer[Any]
+          //根据时间创建一个blockId
           val blockId = StreamBlockId(receiverId, time - blockIntervalMs)
           listener.onGenerateBlock(blockId)
+          //TODO 创建一个block
           newBlock = new Block(blockId, newBlockBuffer)
         }
       }
 
       if (newBlock != null) {
+        //TODO 将block推入blocksForPushing里面
         blocksForPushing.put(newBlock)  // put is blocking when queue is full
       }
     } catch {
@@ -266,6 +278,7 @@ private[streaming] class BlockGenerator(
       // While blocks are being generated, keep polling for to-be-pushed blocks and push them.
       while (areBlocksBeingGenerated) {
         Option(blocksForPushing.poll(10, TimeUnit.MILLISECONDS)) match {
+            //TODO tianyafu 如果拿到block 就去推送block
           case Some(block) => pushBlock(block)
           case None =>
         }
@@ -293,7 +306,9 @@ private[streaming] class BlockGenerator(
     listener.onError(message, t)
   }
 
+  //TODO tianyafu 推送block
   private def pushBlock(block: Block) {
+    //推送block
     listener.onPushBlock(block.id, block.buffer)
     logInfo("Pushed block " + block.id)
   }

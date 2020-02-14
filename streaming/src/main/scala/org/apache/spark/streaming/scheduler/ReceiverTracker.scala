@@ -524,6 +524,7 @@ class ReceiverTracker(ssc: StreamingContext, skipReceiverLaunch: Boolean = false
         val successful =
           registerReceiver(streamId, typ, host, executorId, receiverEndpoint, context.senderAddress)
         context.reply(successful)
+        //TODO tianyafu ReceiverSupervisorImpl通过ReceiverTrackerEndpoint向ReceiverTracker汇报block的元数据信息
       case AddBlock(receivedBlockInfo) =>
         if (WriteAheadLogUtils.isBatchingEnabled(ssc.conf, isDriver = true)) {
           walBatchingThreadPool.execute(new Runnable {

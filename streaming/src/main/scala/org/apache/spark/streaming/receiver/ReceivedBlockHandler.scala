@@ -70,10 +70,12 @@ private[streaming] class BlockManagerBasedBlockHandler(
     blockManager: BlockManager, storageLevel: StorageLevel)
   extends ReceivedBlockHandler with Logging {
 
+  //TODO tianyafu 没有开启预写日志的情况下存储block
   def storeBlock(blockId: StreamBlockId, block: ReceivedBlock): ReceivedBlockStoreResult = {
 
     var numRecords: Option[Long] = None
 
+    //TODO tianyafu 使用blockManager将block存储起来
     val putSucceeded: Boolean = block match {
       case ArrayBufferBlock(arrayBuffer) =>
         numRecords = Some(arrayBuffer.size.toLong)
@@ -188,6 +190,7 @@ private[streaming] class WriteAheadLogBasedBlockHandler(
     }
 
     // Store the block in block manager
+    //TODO tianyafu 往blockManager中写入block
     val storeInBlockManagerFuture = Future {
       val putSucceeded = blockManager.putBytes(
         blockId,
@@ -201,6 +204,7 @@ private[streaming] class WriteAheadLogBasedBlockHandler(
     }
 
     // Store the block in write ahead log
+    //TODO  tianyafu 往预写日志中写入block
     val storeInWriteAheadLogFuture = Future {
       writeAheadLog.write(serializedBlock.toByteBuffer, clock.getTimeMillis())
     }

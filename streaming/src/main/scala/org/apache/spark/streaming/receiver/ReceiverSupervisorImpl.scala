@@ -53,7 +53,7 @@ private[streaming] class ReceiverSupervisorImpl(
   private val executorId = SparkEnv.get.blockManager.blockManagerId.executorId
 
   private val receivedBlockHandler: ReceivedBlockHandler = {
-    if (WriteAheadLogUtils.enableReceiverLog(env.conf)) {
+    if (WriteAheadLogUtils.enableReceiverLog(env.conf)) {//TODO tianyafu 如果开启了预写日志
       if (checkpointDirOption.isEmpty) {
         throw new SparkException(
           "Cannot enable receiver write-ahead log without checkpoint directory set. " +
@@ -62,7 +62,7 @@ private[streaming] class ReceiverSupervisorImpl(
       }
       new WriteAheadLogBasedBlockHandler(env.blockManager, env.serializerManager, receiver.streamId,
         receiver.storageLevel, env.conf, hadoopConf, checkpointDirOption.get)
-    } else {
+    } else {//TODO tianyafu 如果没有开启预写日志
       new BlockManagerBasedBlockHandler(env.blockManager, receiver.storageLevel)
     }
   }
@@ -106,6 +106,7 @@ private[streaming] class ReceiverSupervisorImpl(
       reportError(message, throwable)
     }
 
+    //TODO tianyafu 推送block
     def onPushBlock(blockId: StreamBlockId, arrayBuffer: ArrayBuffer[_]) {
       pushArrayBuffer(arrayBuffer, None, Some(blockId))
     }
@@ -121,6 +122,7 @@ private[streaming] class ReceiverSupervisorImpl(
   }
 
   /** Store an ArrayBuffer of received data as a data block into Spark's memory. */
+  //TODO tianyafu 调用pushAndReportBlock方法推送block并向ReceiverTracker报告block的信息
   def pushArrayBuffer(
       arrayBuffer: ArrayBuffer[_],
       metadataOption: Option[Any],
@@ -155,10 +157,12 @@ private[streaming] class ReceiverSupervisorImpl(
     ) {
     val blockId = blockIdOption.getOrElse(nextBlockId)
     val time = System.currentTimeMillis
+    //TODO tianyafu  将block通过blockManager存储起来
     val blockStoreResult = receivedBlockHandler.storeBlock(blockId, receivedBlock)
     logDebug(s"Pushed block $blockId in ${(System.currentTimeMillis - time)} ms")
     val numRecords = blockStoreResult.numRecords
     val blockInfo = ReceivedBlockInfo(streamId, numRecords, metadataOption, blockStoreResult)
+    //TODO tianyafu 向ReceiverTracker汇报block的相关元数据信息
     trackerEndpoint.askSync[Boolean](AddBlock(blockInfo))
     logDebug(s"Reported block $blockId")
   }
