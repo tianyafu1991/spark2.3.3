@@ -413,6 +413,7 @@ private[deploy] class Master(
   }
 
   override def receiveAndReply(context: RpcCallContext): PartialFunction[Any, Unit] = {
+    //TODO tianyafu 接收Driver注册的消息
     case RequestSubmitDriver(description) =>
       if (state != RecoveryState.ALIVE) {
         val msg = s"${Utils.BACKUP_STANDALONE_MASTER_PREFIX}: $state. " +
@@ -420,6 +421,7 @@ private[deploy] class Master(
         context.reply(SubmitDriverResponse(self, false, None, msg))
       } else {
         logInfo("Driver submitted " + description.command.mainClass)
+        //TODO tianyafu 根据DriverDescription创建一个DriverInfo对象,该DriverInfo对象就是我们所说的Driver
         val driver = createDriver(description)
         persistenceEngine.addDriver(driver)
         waitingDrivers += driver

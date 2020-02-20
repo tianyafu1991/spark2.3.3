@@ -355,6 +355,7 @@ private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, S
   }
 
   /** Fill in values by parsing user options. */
+  //TODO tianyafu 解析我们传递的参数
   override protected def handle(opt: String, value: String): Boolean = {
     opt match {
       case NAME =>

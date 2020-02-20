@@ -144,6 +144,7 @@ private[spark] class Client(
   def submitApplication(): ApplicationId = {
     var appId: ApplicationId = null
     try {
+      //TODO tianyafu launcherBackend在前面已经进行了初始化，launcherBackend是一个底层使用Socket用来传递信息的抽象类
       launcherBackend.connect()
       // Setup the credentials before doing anything else,
       // so we have don't have issues at any point.
@@ -155,6 +156,7 @@ private[spark] class Client(
         .format(yarnClient.getYarnClusterMetrics.getNumNodeManagers))
 
       // Get a new application from our RM
+      //TODO tianyafu  通过yarn api 创建一个application
       val newApp = yarnClient.createApplication()
       val newAppResponse = newApp.getNewApplicationResponse()
       appId = newAppResponse.getApplicationId()
@@ -163,14 +165,17 @@ private[spark] class Client(
         Option(appId.toString)).setCurrentContext()
 
       // Verify whether the cluster has enough resources for our AM
+      //TODO tianyafu 检测集群是否有足够的资源可以调用
       verifyClusterResources(newAppResponse)
 
       // Set up the appropriate contexts to launch our AM
+      //TODO tianyafu 初始化上下文用于启动ApplicationManager
       val containerContext = createContainerLaunchContext(newAppResponse)
       val appContext = createApplicationSubmissionContext(newApp, containerContext)
 
       // Finally, submit and monitor the application
       logInfo(s"Submitting application $appId to ResourceManager")
+      //TODO tianyafu 最后提交应用，并返回appId
       yarnClient.submitApplication(appContext)
       launcherBackend.setAppId(appId.toString)
       reportLauncherState(SparkAppHandle.State.SUBMITTED)
@@ -1102,6 +1107,7 @@ private[spark] class Client(
         }
       }
 
+      //TODO tianyafu 应用的状态为FINISHED  FAILED或者KILLED这类最终状态的话就返回
       if (state == YarnApplicationState.FINISHED ||
         state == YarnApplicationState.FAILED ||
         state == YarnApplicationState.KILLED) {
@@ -1159,6 +1165,7 @@ private[spark] class Client(
         throw new SparkException(s"Application $appId finished with status: $state")
       }
     } else {
+      //TODO tianyafu 正常提交完应用  应用的状态应该为SUBMITTED  此时就会走到这里调用monitorApplication(appId)来进行应用的监控
       val (yarnApplicationState, finalApplicationStatus) = monitorApplication(appId)
       if (yarnApplicationState == YarnApplicationState.FAILED ||
         finalApplicationStatus == FinalApplicationStatus.FAILED) {

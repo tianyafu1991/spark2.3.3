@@ -95,10 +95,14 @@ object SparkSubmit extends CommandLineUtils with Logging {
   private val CLASS_NOT_FOUND_EXIT_STATUS = 101
 
   // Following constants are visible for testing.
+  //TODO yarn cluster下的mainClass   yarn client模式下是直接启动我们自己参数中设置的main类为启动类的
   private[deploy] val YARN_CLUSTER_SUBMIT_CLASS =
     "org.apache.spark.deploy.yarn.YarnClusterApplication"
+  //TODO tianyafu standalone cluster 模式下默认使用的是使用rest client的方式去提交应用的 childMainClass
   private[deploy] val REST_CLUSTER_SUBMIT_CLASS = classOf[RestSubmissionClientApp].getName()
+  //TODO tianyafu standalone cluster 模式下如果配置了不使用rest的方式去  则提交应用的使用该 childMainClass
   private[deploy] val STANDALONE_CLUSTER_SUBMIT_CLASS = classOf[ClientApp].getName()
+  //TODO k8s下的mainClass
   private[deploy] val KUBERNETES_CLUSTER_SUBMIT_CLASS =
     "org.apache.spark.deploy.k8s.submit.KubernetesClientApplication"
 
@@ -134,6 +138,7 @@ object SparkSubmit extends CommandLineUtils with Logging {
       // scalastyle:on println
     }
     appArgs.action match {
+        //TODO tianyafu 提交spark application
       case SparkSubmitAction.SUBMIT => submit(appArgs, uninitLog)
       case SparkSubmitAction.KILL => kill(appArgs)
       case SparkSubmitAction.REQUEST_STATUS => requestStatus(appArgs)
@@ -168,6 +173,7 @@ object SparkSubmit extends CommandLineUtils with Logging {
    */
   @tailrec
   private def submit(args: SparkSubmitArguments, uninitLog: Boolean): Unit = {
+    //TODO tianyafu 准备下一步要执行的相关类及参数 比如匹配集群管理器是哪种  childMainClass是哪个 等等
     val (childArgs, childClasspath, sparkConf, childMainClass) = prepareSubmitEnvironment(args)
 
     def doRunMain(): Unit = {
@@ -266,6 +272,7 @@ object SparkSubmit extends CommandLineUtils with Logging {
     var childMainClass = ""
 
     // Set the cluster manager
+    //TODO tianyafu 设置集群管理器
     val clusterManager: Int = args.master match {
       case "yarn" => YARN
       case "yarn-client" | "yarn-cluster" =>
@@ -282,6 +289,7 @@ object SparkSubmit extends CommandLineUtils with Logging {
     }
 
     // Set the deploy mode; default is client mode
+    //TODO tianyafu 设置提交模式
     var deployMode: Int = args.deployMode match {
       case "client" | null => CLIENT
       case "cluster" => CLUSTER
@@ -408,6 +416,7 @@ object SparkSubmit extends CommandLineUtils with Logging {
     lazy val secMgr = new SecurityManager(sparkConf)
 
     // In client mode, download remote files.
+    //TODO tianyafu client模式下下载文件:jar包 配置文件等等
     var localPrimaryResource: String = null
     var localJars: String = null
     var localPyFiles: String = null
@@ -620,6 +629,7 @@ object SparkSubmit extends CommandLineUtils with Logging {
 
     // In client mode, launch the application main class directly
     // In addition, add the main application jar and any added jars (if any) to the classpath
+    //TODO tianyafu client模式下,直接执行我们自己submit参数中设置的mainClass
     if (deployMode == CLIENT) {
       childMainClass = args.mainClass
       if (localPrimaryResource != null && isUserJar(localPrimaryResource)) {
@@ -670,8 +680,10 @@ object SparkSubmit extends CommandLineUtils with Logging {
 
     // In standalone cluster mode, use the REST client to submit the application (Spark 1.3+).
     // All Spark parameters are expected to be passed to the client through system properties.
+    //TODO tianyafu standalone cluster 模式下的 childMainClass 以及参数的配置
     if (args.isStandaloneCluster) {
-      if (args.useRest) {
+      if (args.useRest) {//默认使用rest client方式
+        //TODO tianyafu 使用 RestSubmissionClientApp类来提交应用
         childMainClass = REST_CLUSTER_SUBMIT_CLASS
         childArgs += (args.primaryResource, args.mainClass)
       } else {
@@ -700,7 +712,9 @@ object SparkSubmit extends CommandLineUtils with Logging {
     }
 
     // In yarn-cluster mode, use yarn.Client as a wrapper around the user class
+    //TODO tianyafu yarn cluster模式下 指定 该模式下的 childMainClass
     if (isYarnCluster) {
+      //TODO tianyafu 该模式下mainClass为 org.apache.spark.deploy.yarn.YarnClusterApplication
       childMainClass = YARN_CLUSTER_SUBMIT_CLASS
       if (args.isPython) {
         childArgs += ("--primary-py-file", args.primaryResource)
@@ -848,6 +862,7 @@ object SparkSubmit extends CommandLineUtils with Logging {
     var mainClass: Class[_] = null
 
     try {
+      //TODO tianyafu 加载childMainClass
       mainClass = Utils.classForName(childMainClass)
     } catch {
       case e: ClassNotFoundException =>

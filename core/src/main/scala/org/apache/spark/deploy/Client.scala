@@ -93,6 +93,7 @@ private class ClientEndpoint(
           driverArgs.cores,
           driverArgs.supervise,
           command)
+        //TODO tianyafu 向master发送RequestSubmitDriver消息  以便让master去启动Driver
         asyncSendToMasterAndForwardReply[SubmitDriverResponse](
           RequestSubmitDriver(driverDescription))
 
@@ -149,6 +150,7 @@ private class ClientEndpoint(
 
   override def receive: PartialFunction[Any, Unit] = {
 
+    //TODO tianyafu  收到master发送过来的提交Driver的回复
     case SubmitDriverResponse(master, success, driverId, message) =>
       logInfo(message)
       if (success) {
@@ -224,6 +226,7 @@ object Client {
 private[spark] class ClientApp extends SparkApplication {
 
   override def start(args: Array[String], conf: SparkConf): Unit = {
+    //TODO tianyafu 参数解析
     val driverArgs = new ClientArguments(args)
 
     if (!conf.contains("spark.rpc.askTimeout")) {
@@ -231,9 +234,11 @@ private[spark] class ClientApp extends SparkApplication {
     }
     Logger.getRootLogger.setLevel(driverArgs.logLevel)
 
+    //TODO tianyafu 创建RPC环境
     val rpcEnv =
       RpcEnv.create("driverClient", Utils.localHostName(), 0, conf, new SecurityManager(conf))
 
+    //TODO tianyafu 获取master的endpoint引用
     val masterEndpoints = driverArgs.masters.map(RpcAddress.fromSparkURL).
       map(rpcEnv.setupEndpointRef(_, Master.ENDPOINT_NAME))
     rpcEnv.setupEndpoint("client", new ClientEndpoint(rpcEnv, driverArgs, masterEndpoints, conf))
